@@ -2,10 +2,12 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
-  test: {
+  test: {    
     environment: "node",
     globals: true,
     include: ["tests/**/*.test.ts", "src/**/*.test.ts", ],
+
+    maxWorkers:1,
   },
   resolve: {
     alias: {

@@ -3,6 +3,16 @@ import { AuthorizationGuard } from "./guards/AuthorizationGuard";
 import { EntityId } from "@/shared/value-objects/EntityId";
 import { NotFoundError } from "@/shared/errors/ApplicationError";
 import { OrderStatus } from "@/modules/sales/domain/OrderStatus";
+import { Money } from '@/shared/value-objects/Money';
+
+//===========================================================
+import { PaymentRepository } from '@/modules/sales/domain/PaymentRepository';
+import { Payment } from '@/modules/sales/domain/Payment';
+import { randomUUID } from 'crypto';
+
+const paymentId = EntityId.of(randomUUID());
+
+
 
 /**
  * Actor context (application boundary)
@@ -21,11 +31,17 @@ interface Actor {
  */
 export class PayCredit {
   constructor(
-    private readonly orderRepository: OrderRepository
+    private readonly orderRepository: OrderRepository,
+    private readonly paymentRepository: PaymentRepository
   ) {}
 
-  async execute(input: { orderId: string; actor: Actor }): Promise<void> {
-    const { orderId, actor } = input;
+  async execute(input: { 
+    orderId: string; 
+    amount: number;
+    occurredAt: Date;
+    actor: Actor;
+   }): Promise<void> {
+    const {  orderId, amount, occurredAt, actor } = input;
 
     /**
      * Authorization boundary
@@ -59,10 +75,49 @@ export class PayCredit {
        */
     }
 
+    if (amount <= 0) {
+      throw new Error('Payment amount must be greater than zero');
+    }
+
     /**
-     * Domain invariant owner
+     * Domain invariant check
      */
-    order.markAsPaid();
+    const paymentAmount = Money.of(amount);
+
+    if (paymentAmount.get() > order.getOutstandingAmount().get()) {
+       throw new Error('Payment amount exceeds outstanding amount');
+    }
+
+
+
+     /**
+     * Create payment fact
+     */
+    const payment = new Payment(
+      EntityId.of(randomUUID()).toString(),
+      orderIdVO.toString(),
+      amount,
+      occurredAt,
+      new Date(),
+    );
+
+    /**
+     * Persist payment
+     */
+    await this.paymentRepository.save(payment);
+
+    /**
+     * Recompute order state from facts
+     */
+   const totalPaidNumber =
+    await this.paymentRepository.sumAmountByOrderId(orderIdVO.toString());
+
+    const totalPaidMoney =
+      totalPaidNumber === 0 ? Money.zero() : Money.of(totalPaidNumber);
+
+    order.recomputeOutstanding(totalPaidMoney);
+
+
 
     /**
      * Persist state

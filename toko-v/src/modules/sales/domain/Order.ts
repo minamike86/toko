@@ -1,13 +1,12 @@
 import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
+import { DomainError } from '@/shared/errors/DomainError';
 
 import { OrderItem } from "./OrderItem";
 import { OrderStatus } from "./OrderStatus";
 import { OrderType } from "./OrderType";
 import {
-  EmptyOrderItemsError,
-  InvalidOrderStatusTransitionError,
-  OrderAlreadyCanceledError,
+  EmptyOrderItemsError,  InvalidOrderStatusTransitionError,   OrderAlreadyCanceledError,
 } from "./SalesErrors";
 
 export class Order {
@@ -200,6 +199,26 @@ export class Order {
     params.createdAt,
     params.createdBy
   );
+}
+
+public recomputeOutstanding(totalPaid: Money): void {
+  const totalAmountNumber = this.totalAmount.get();
+  const totalPaidNumber = totalPaid.get();
+
+  if (totalPaidNumber > totalAmountNumber) {
+    throw new DomainError('Total paid melebihi total order');
+  }
+
+  const newOutstanding = totalAmountNumber - totalPaidNumber;
+
+  // newOutstanding boleh 0, tapi Money.of(0) akan throw (karena aturan Money.of > 0)
+  if (newOutstanding === 0) {
+    this.outstandingAmount = Money.zero();
+    this.status = OrderStatus.PAID;
+    return;
+  }
+
+  this.outstandingAmount = Money.of(newOutstanding);
 }
 
 }
