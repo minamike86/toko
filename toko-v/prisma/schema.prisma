@@ -22,6 +22,8 @@ model Order {
 
   items             OrderItem[]
 
+  payments Payment[] // relasi pasif, tanpa logic
+  
   @@index([status])
   @@index([createdAt])
   
@@ -70,4 +72,17 @@ model StockMovement {
   @@index([referenceId])
   @@index([occurredAt])
   
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  orderId    String
+  amount     Int
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([occurredAt])
 }

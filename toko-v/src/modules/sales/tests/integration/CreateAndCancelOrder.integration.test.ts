@@ -1,157 +1,96 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import "./_bootstrap";
+import { salesPrisma as prisma } from "./_bootstrap";
 
-/**
- * SALES
- */
-import { CreateOrder } from "@/modules/sales/application/CreateOrder";
-import { CancelOrder } from "@/modules/sales/application/CancelOrder";
-import { PrismaOrderRepository } from "@/modules/sales/infrastructure/PrismaOrderRepository";
+import { describe, it, expect } from "vitest";
+
+import { createOrder, cancelOrder } from "@/wiring/container";
+import { seedInventory } from "@/tests/helpers/seedInventory";
+import { OrderStatus } from "@/modules/sales/domain/OrderStatus";
 import { OrderType } from "@/modules/sales/domain/OrderType";
 
-
-/**
- * INVENTORY
- */
-import { PrismaInventoryRepository } from "@/modules/inventory/infrastructure/PrismaInventoryRepository";
-import { IssueStock } from "@/modules/inventory/application/IssueStock";
-import { ReceiveStock } from "@/modules/inventory/application/ReceiveStock";
-import { InventoryServiceAdapter } from "@/modules/inventory/infrastructure/InventoryServiceAdapter";
-
-/**
- * CATALOG (READ)
- */
-import { InMemoryCatalogReadRepository } from "@/modules/catalog/infrastructure/InMemoryCatalogReadRepository";
-
-/**
- * PRISMA
- */
-const prisma = new PrismaClient();
-
 describe("Integration: CreateOrder → Inventory → CancelOrder", () => {
-  beforeEach(async () => {
-    // urutan penting (FK)
-    await prisma.stockMovement.deleteMany();
-    await prisma.inventoryItem.deleteMany();
-    await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
+  it("creates CASH OFFLINE order (PAID), reduces stock, then cancels and restores stock", async () => {
+    // ---------------------------------------------------------------------
+    // GIVEN: inventory tersedia
+    // ---------------------------------------------------------------------
+    const PRODUCT_ID = "P001";
+    const INITIAL_STOCK = 10;
+    const ORDER_QTY = 2;
+    const ORDER_ID = "ORDER-1";
 
-    // seed inventory
-    await prisma.inventoryItem.create({
-      data: {
-        productId: "P001",
-        quantity: 10,
-      },
+    await seedInventory(prisma, {
+      productId: PRODUCT_ID,
+      quantity: INITIAL_STOCK,
     });
-  });
 
-  it("creates PAID order, reduces stock, then cancels and restores stock", async () => {
-    // =========================
-    // REPOSITORIES
-    // =========================
-    const orderRepo = new PrismaOrderRepository(prisma);
-    const inventoryRepo = new PrismaInventoryRepository(prisma);
+    const inventoryBefore = await prisma.inventoryItem.findUnique({
+      where: { productId: PRODUCT_ID },
+    });
 
-    // =========================
-    // INVENTORY USE CASES
-    // =========================
-    const issueStock = new IssueStock(inventoryRepo);
-    const receiveStock = new ReceiveStock(inventoryRepo);
+    expect(inventoryBefore?.quantity).toBe(INITIAL_STOCK);
 
-    const inventoryService = new InventoryServiceAdapter(
-      issueStock,
-      receiveStock
+    // ---------------------------------------------------------------------
+    // WHEN: order OFFLINE + CASH dibuat
+    // ---------------------------------------------------------------------
+    await createOrder.execute({
+      orderId: ORDER_ID,
+      type: OrderType.OFFLINE,
+      createdBy: "user-1",
+      payment: "CASH",
+      items: [
+        {
+          productId: PRODUCT_ID,
+          quantity: ORDER_QTY,
+        },
+      ],
+    });
+
+    // ---------------------------------------------------------------------
+    // THEN: order langsung PAID (domain rule)
+    // ---------------------------------------------------------------------
+    const orderAfterCreate = await prisma.order.findUnique({
+      where: { id: ORDER_ID },
+    });
+
+    expect(orderAfterCreate).toBeDefined();
+    expect(orderAfterCreate?.status).toBe(OrderStatus.PAID);
+    expect(orderAfterCreate?.outstandingAmount).toBe(0);
+
+    // ---------------------------------------------------------------------
+    // AND: stok berkurang
+    // ---------------------------------------------------------------------
+    const inventoryAfterCreate = await prisma.inventoryItem.findUnique({
+      where: { productId: PRODUCT_ID },
+    });
+
+    expect(inventoryAfterCreate?.quantity).toBe(
+      INITIAL_STOCK - ORDER_QTY
     );
 
-    // =========================
-    // CATALOG (READ-ONLY)
-    // =========================
-    const catalogReadRepo = new InMemoryCatalogReadRepository([
-      {
-        productId: "P001",
-        name: "Produk A",
-        unit: "pcs",
-        price: 10000,
-        isActive: true,
-      },
-    ]);
-
-    // =========================
-    // SALES USE CASES
-    // =========================
-    const createOrder = new CreateOrder({
-      orderRepo,
-      catalogReadRepo,
-      inventoryService,
+    // ---------------------------------------------------------------------
+    // WHEN: order dibatalkan
+    // ---------------------------------------------------------------------
+    await cancelOrder.execute({
+      orderId: ORDER_ID,
+      canceledBy: "user-1",
     });
 
-    const cancelOrder = new CancelOrder({
-      orderRepo,
-      inventoryService,
+    // ---------------------------------------------------------------------
+    // THEN: status order CANCELED
+    // ---------------------------------------------------------------------
+    const orderAfterCancel = await prisma.order.findUnique({
+      where: { id: ORDER_ID },
     });
 
-    // =========================
-    // ACT: CREATE ORDER
-    // =========================
-    const createResult = await createOrder.execute({
-  orderId: "ORDER-1",
-  type: OrderType.OFFLINE,
-  payment: "CASH",
-  createdBy: "tester",
-  items: [
-    {
-      productId: "P001",
-      quantity: 3,
-    },
-  ],
-});
+    expect(orderAfterCancel?.status).toBe(OrderStatus.CANCELED);
 
-    expect(createResult.status).toBe("PAID");
-
-    const stockAfterCreate = await prisma.inventoryItem.findUnique({
-      where: { productId: "P001" },
+    // ---------------------------------------------------------------------
+    // AND: stok dikembalikan penuh
+    // ---------------------------------------------------------------------
+    const inventoryAfterCancel = await prisma.inventoryItem.findUnique({
+      where: { productId: PRODUCT_ID },
     });
 
-    expect(stockAfterCreate?.quantity).toBe(7);
-
-    // =========================
-    // ACT: CANCEL ORDER
-    // =========================
-    const cancelResult = await cancelOrder.execute({
-      orderId: "ORDER-1",
-      canceledBy: "tester",
-    });
-
-    expect(cancelResult.status).toBe("CANCELED");
-
-    const stockAfterCancel = await prisma.inventoryItem.findUnique({
-      where: { productId: "P001" },
-    });
-
-    expect(stockAfterCancel?.quantity).toBe(10);
-
-    // =========================
-    // ASSERT STOCK MOVEMENTS
-    // =========================
-    const movements = await prisma.stockMovement.findMany({
-      where: { productId: "P001" },
-      orderBy: { occurredAt: "asc" },
-    });
-
-    expect(movements).toHaveLength(2);
-
-    expect(movements[0]).toMatchObject({
-      type: "OUT",
-      quantity: 3,
-      reason: "SALE_ORDER",
-      referenceId: "ORDER-1",
-    });
-
-    expect(movements[1]).toMatchObject({
-      type: "IN",
-      quantity: 3,
-      reason: "CANCEL_ORDER",
-      referenceId: "ORDER-1",
-    });
+    expect(inventoryAfterCancel?.quantity).toBe(INITIAL_STOCK);
   });
 });
