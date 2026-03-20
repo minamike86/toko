@@ -1,0 +1,73 @@
+datasource db {
+  provider = "mysql" // atau postgresql
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/* ======================================================
+   SALES DOMAIN
+   ====================================================== */
+
+model Order {
+  id                String   @id
+  type              String
+  status            String
+  totalAmount       Int
+  outstandingAmount Int
+  createdAt         DateTime
+  createdBy         String
+
+  items             OrderItem[]
+
+  @@index([status])
+  @@index([createdAt])
+  
+}
+
+model OrderItem {
+  id                   String @id
+  orderId              String
+
+  productId            String
+  productNameSnapshot  String
+  unitSnapshot         String
+  unitPriceSnapshot    Int
+  quantity             Int
+  subtotal             Int
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
+ 
+}
+
+/* ======================================================
+   INVENTORY DOMAIN
+   ====================================================== */
+
+model InventoryItem {
+  productId String @id
+  quantity  Int
+
+  @@index([quantity])
+ 
+}
+
+model StockMovement {
+  id          String   @id
+  productId   String
+  type        String   // IN | OUT | ADJUST
+  quantity    Int
+  reason      String
+  referenceId String?
+  occurredAt  DateTime
+
+  @@index([productId])
+  @@index([referenceId])
+  @@index([occurredAt])
+  
+}
