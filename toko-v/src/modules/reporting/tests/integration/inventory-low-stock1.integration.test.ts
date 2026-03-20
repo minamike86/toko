@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { reportingPrisma as prisma } from "./_bootstrap";
 
 import { seedInventoryReportingScenario } from "../helpers/seedInventoryReportingScenario";
-import { findInventoryLowStock } from "../../queries/inventory-low-stock.query";
+import { getInventoryLowStockReport } from "../../application/get-inventory-low-stock-report";
 
 describe("Inventory Low Stock Report (integration)", () => {
   beforeEach(async () => {
@@ -19,7 +19,7 @@ describe("Inventory Low Stock Report (integration)", () => {
       ],
     });
 
-    const result = await findInventoryLowStock({ threshold: 5 });
+    const result = await getInventoryLowStockReport({ threshold: 5 });
 
     expect(result).toEqual([
       { productId: "P003", currentStockQuantity: 2 },
@@ -35,7 +35,7 @@ describe("Inventory Low Stock Report (integration)", () => {
       ],
     });
 
-    const result = await findInventoryLowStock({ threshold: 5 });
+    const result = await getInventoryLowStockReport({ threshold: 5 });
 
     expect(result).toEqual([]);
   });
@@ -49,7 +49,7 @@ describe("Inventory Low Stock Report (integration)", () => {
       ],
     });
 
-    const result = await findInventoryLowStock({ threshold: 5 });
+    const result = await getInventoryLowStockReport({ threshold: 5 });
 
     expect(result).toEqual([
       { productId: "P003", currentStockQuantity: 1 },
@@ -66,7 +66,7 @@ describe("Inventory Low Stock Report (integration)", () => {
       ],
     });
 
-    const result = await findInventoryLowStock({ threshold: 5 });
+    const result = await getInventoryLowStockReport({ threshold: 5 });
 
     expect(result).toEqual([]);
   });
@@ -76,7 +76,7 @@ describe("Inventory Low Stock Report (integration)", () => {
       inventoryItems: [{ productId: "P001", quantity: 0 }],
     });
 
-    const result = await findInventoryLowStock({ threshold: -1 });
+    const result = await getInventoryLowStockReport({ threshold: -1 });
 
     expect(result).toEqual([]);
   });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { reportingPrisma as prisma } from "./_bootstrap";
 
 import { seedInventoryReportingScenario } from "../helpers/seedInventoryReportingScenario";
-import { findInventoryMovementHistory } from "../../queries/inventory-movement-history.query";
+import { getInventoryMovementHistoryReport } from "../../application/get-inventory-movement-history-report";
 
 describe("Inventory Movement History Report (integration)", () => {
   beforeEach(async () => {
@@ -35,7 +35,7 @@ describe("Inventory Movement History Report (integration)", () => {
       ],
     });
 
-    const result = await findInventoryMovementHistory();
+    const result = await getInventoryMovementHistoryReport();
 
     expect(result.map((r) => r.id)).toEqual(["A", "B"]);
   });
@@ -68,7 +68,7 @@ describe("Inventory Movement History Report (integration)", () => {
       ],
     });
 
-    const result = await findInventoryMovementHistory({
+    const result = await getInventoryMovementHistoryReport({
       productId: "P001",
     });
 
@@ -90,7 +90,7 @@ describe("Inventory Movement History Report (integration)", () => {
       ],
     });
 
-    const result = await findInventoryMovementHistory({
+    const result = await getInventoryMovementHistoryReport({
       from: d1,
       to: d2,
     });
@@ -113,7 +113,7 @@ describe("Inventory Movement History Report (integration)", () => {
       })),
     });
 
-    const result = await findInventoryMovementHistory();
+    const result = await getInventoryMovementHistoryReport();
 
     expect(result).toHaveLength(5);
   });

@@ -1,4 +1,4 @@
-export type InventorySnapshotReportRow = {
+export type InventoryLowStockDTO = {
   productId: string;
   currentStockQuantity: number;
 };
