@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "db:backup": "ts-node scripts/db/backup.ts",
+    "db:restore": "ts-node scripts/db/restore.ts"
+
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",

@@ -86,3 +86,10 @@ model Payment {
   @@index([orderId])
   @@index([occurredAt])
 }
+
+model SystemSetting {
+  key        String   @id
+  value      String
+  updatedAt  DateTime @updatedAt
+  updatedBy  String
+}
