@@ -22,8 +22,8 @@ class InMemoryInventoryRepository implements InventoryRepository {
       },
 
       canFulfill: (_qty: number): boolean => true,
-      decrease: (_qty: number): void => {},
-      increase: (_qty: number): void => {},
+      decrease: (_qty: number): void => { },
+      increase: (_qty: number): void => { },
     };
 
     // CAST RESMI untuk test double
@@ -70,5 +70,8 @@ describe("AdjustStock", () => {
     expect(movement.productId).toBe("P-1");
     expect(movement.quantity).toBe(5);
     expect(movement.reason).toBe("stock opname");
+    expect(movement.type).toBe("ADJUST");
+    expect(movement.origin).toBe("MANUAL_ADJUSTMENT");
+
   });
 });

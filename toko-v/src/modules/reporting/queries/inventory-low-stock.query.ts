@@ -1,45 +1,17 @@
-// inventory-low-stock.query.ts
+// inventory-low-stock-query.ts
 
-export type InventoryLowStockDTO = {
-  productId: string;
-  currentStockQuantity: number;
-};
+import { prisma } from "@/shared/prisma";
+import type { InventoryLowStockDTO } from "@/modules/reporting/dto/inventory-low-stock.dto"
 
-type ReportingDb = {
-  inventoryItem: {
-    findMany: (args: {
-      where: {
-        quantity: {
-          lte: number;
-        };
-      };
-      orderBy: [{ quantity: "asc" }, { productId: "asc" }];
-      select: {
-        productId: true;
-        quantity: true;
-      };
-    }) => Promise<
-      {
-        productId: string;
-        quantity: number;
-      }[]
-    >;
-  };
-};
 
-export async function getInventoryLowStock(
-  db: ReportingDb,
-  input: { threshold: number }
-): Promise<InventoryLowStockDTO[]> {
-  if (input.threshold < 0) {
-    return [];
-  }
+export async function findInventoryLowStock(input: {
+  threshold: number;
+}): Promise<InventoryLowStockDTO[]> {
+  if (input.threshold < 0) return [];
 
-  const rows = await db.inventoryItem.findMany({
+  const rows = await prisma.inventoryItem.findMany({
     where: {
-      quantity: {
-        lte: input.threshold,
-      },
+      quantity: { lte: input.threshold },
     },
     orderBy: [
       { quantity: "asc" },

@@ -1,12 +1,8 @@
-export type InventoryMovementHistoryDTO = {
-  id: string;
-  productId: string;
-  movementDate: Date;
-  movementType: string;
-  quantity: number;
-  reason: string;
-  referenceId: string | null;
-};
+// inventory-movement-history-query.ts
+
+import { prisma } from "@/shared/prisma";
+import type { InventoryMovementHistoryDTO } from "@/modules/reporting/dto/inventory-movement-history.dto"
+
 
 type MovementWhere = {
   productId?: string;
@@ -16,34 +12,11 @@ type MovementWhere = {
   };
 };
 
-type MovementRow = {
-  id: string;
-  productId: string;
-  occurredAt: Date;
-  type: string;
-  quantity: number;
-  reason: string;
-  referenceId: string | null;
-};
-
-
-type ReportingDb = {
-  stockMovement: {
-    findMany: (args: {
-      where?: MovementWhere;
-      orderBy: [{ occurredAt: "asc" }, { id: "asc" }];
-    }) => Promise<MovementRow[]>;
-  };
-};
-
-export async function getInventoryMovementHistory(
-  db: ReportingDb,
-  filter?: {
-    productId?: string;
-    from?: Date;
-    to?: Date;
-  }
-): Promise<InventoryMovementHistoryDTO[]> {
+export async function findInventoryMovementHistory(filter?: {
+  productId?: string;
+  from?: Date;
+  to?: Date;
+}): Promise<InventoryMovementHistoryDTO[]> {
   const where: MovementWhere = {};
 
   if (filter?.productId) {
@@ -57,7 +30,7 @@ export async function getInventoryMovementHistory(
     };
   }
 
-  const rows = await db.stockMovement.findMany({
+  const rows = await prisma.stockMovement.findMany({
     where,
     orderBy: [
       { occurredAt: "asc" },
@@ -70,6 +43,7 @@ export async function getInventoryMovementHistory(
     productId: row.productId,
     movementDate: row.occurredAt,
     movementType: row.type,
+    origin: row.origin,
     quantity: row.quantity,
     reason: row.reason,
     referenceId: row.referenceId,

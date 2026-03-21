@@ -12,15 +12,15 @@ export type IssueStockRequest = {
 export class IssueStock {
   constructor(
     private readonly inventoryRepo: InventoryRepository
-  ) {}
+  ) { }
 
   async execute(requests: IssueStockRequest[]): Promise<void> {
     for (const req of requests) {
       const item = await this.inventoryRepo.find(req.productId);
 
-if (!item || !item.canFulfill(req.quantity)) {
-  throw new InsufficientStockError(req.productId);
-}
+      if (!item || !item.canFulfill(req.quantity)) {
+        throw new InsufficientStockError(req.productId);
+      }
 
 
       await this.inventoryRepo.decrease(req.productId, req.quantity);
@@ -29,6 +29,7 @@ if (!item || !item.canFulfill(req.quantity)) {
         req.productId,
         req.quantity,
         req.reason,
+        'LEGACY',
         req.referenceId
       );
 
