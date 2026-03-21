@@ -4,6 +4,7 @@ export type InventoryMovementHistoryDTO = {
   movementDate: Date;
   movementType: string;
   quantity: number;
+  origin: string;
   reason: string;
   referenceId: string | null;
 };

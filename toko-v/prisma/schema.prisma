@@ -63,6 +63,7 @@ model StockMovement {
   id          String   @id
   productId   String
   type        String   // IN | OUT | ADJUST
+  origin      String   // LEGACY | MANUAL_ADJUSTMENT | PURCHASE
   quantity    Int
   reason      String
   referenceId String?
@@ -71,7 +72,6 @@ model StockMovement {
   @@index([productId])
   @@index([referenceId])
   @@index([occurredAt])
-  
 }
 
 model Payment {

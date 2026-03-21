@@ -43,6 +43,7 @@ export async function findInventoryMovementHistory(filter?: {
     productId: row.productId,
     movementDate: row.occurredAt,
     movementType: row.type,
+    origin: row.origin,
     quantity: row.quantity,
     reason: row.reason,
     referenceId: row.referenceId,

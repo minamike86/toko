@@ -61,7 +61,7 @@ class InMemoryInventoryRepository implements InventoryRepository {
    ========================= */
 
 describe("IssueStock Use Case", () => {
-  it("mengurangi stok dan mencatat movement OUT", async () => {
+  it("mengurangi stok dan mencatat movement OUT dengan origin LEGACY", async () => {
     const repo = new InMemoryInventoryRepository([
       { productId: "P001", quantity: 10 },
     ]);
@@ -80,7 +80,15 @@ describe("IssueStock Use Case", () => {
     const item = repo.getItem("P001")!;
     expect(item.getQuantity()).toBe(7);
     expect(repo.getMovements()).toHaveLength(1);
-    expect(repo.getMovements()[0].type).toBe("OUT");
+
+    const movement = repo.getMovements()[0];
+    expect(movement.type).toBe("OUT");
+    expect(movement.origin).toBe("LEGACY");
+    expect(movement.referenceId).toBe("ORD-1");
+    expect(movement.productId).toBe("P001");
+    expect(movement.quantity).toBe(3);
+    expect(movement.reason).toBe("SALE_ORDER");
+
   });
 
   it("melempar error jika stok tidak cukup", async () => {

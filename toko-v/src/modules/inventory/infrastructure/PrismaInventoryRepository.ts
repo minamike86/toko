@@ -1,6 +1,6 @@
 // modules/inventory/infrastructure/PrismaInventoryRepository.ts
 import { PrismaClient } from "@prisma/client";
-import { StockMovement} from '../domain/StockMovement';
+import { StockMovement } from '../domain/StockMovement';
 import { InventoryRepository } from '../domain/InventoryRepository';
 import { InventoryItem } from '../domain/InventoryItem';
 
@@ -9,7 +9,7 @@ import { InventoryItem } from '../domain/InventoryItem';
 export class PrismaInventoryRepository implements InventoryRepository {
   constructor(
     private readonly prisma: PrismaClient
-  ) {}
+  ) { }
 
   async find(productId: string): Promise<InventoryItem | null> {
     const record = await this.prisma.inventoryItem.findUnique({
@@ -62,6 +62,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
         id: movement.id.toString(),
         productId: movement.productId,
         type: movement.type,
+        origin: movement.origin,
         quantity: movement.quantity,
         reason: movement.reason,
         referenceId: movement.referenceId,

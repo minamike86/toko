@@ -11,7 +11,7 @@ export type ReceiveStockRequest = {
 export class ReceiveStock {
   constructor(
     private readonly inventoryRepo: InventoryRepository
-  ) {}
+  ) { }
 
   async execute(requests: ReceiveStockRequest[]): Promise<void> {
     for (const req of requests) {
@@ -21,6 +21,7 @@ export class ReceiveStock {
         req.productId,
         req.quantity,
         req.reason,
+        'LEGACY',
         req.referenceId
       );
 
