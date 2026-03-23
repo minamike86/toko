@@ -13,11 +13,11 @@ import { Payment } from '@/modules/sales/domain/Payment';
 export class InMemoryPaymentRepository implements PaymentRepository {
   private readonly payments: Payment[] = [];
 
-  async save(payment: Payment): Promise<void> {
+  async save(payment: Payment, _tx?: unknown): Promise<void> {
     this.payments.push(payment);
   }
 
-  async sumAmountByOrderId(orderId: string): Promise<number> {
+  async sumAmountByOrderId(orderId: string, _tx?: unknown): Promise<number> {
     let total = 0;
 
     for (const payment of this.payments) {

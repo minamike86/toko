@@ -16,6 +16,7 @@ import {
 } from "@/modules/inventory/application/InventoryService";
 
 import { EntityId } from "@/shared/value-objects/EntityId";
+import { OptimisticLockConflictError } from "@/modules/sales/domain/SalesErrors";
 
 /* ===== Test Doubles ===== */
 
@@ -29,6 +30,23 @@ class InMemoryOrderRepository implements OrderRepository {
   async findById(id: EntityId): Promise<Order | null> {
     return this.store.get(id.toString()) ?? null;
   }
+
+  async saveWithVersionCheck(
+    order: Order,
+    expectedVersion: number,
+    _tx?: unknown
+  ): Promise<void> {
+    const existing = this.store.get(order.id.toString());
+    const currentVersion = existing?.getVersion();
+
+    if (currentVersion === undefined || currentVersion !== expectedVersion) {
+      throw new OptimisticLockConflictError();
+    }
+
+    order._incrementVersion();
+    this.store.set(order.id.toString(), order);
+  }
+
 }
 
 class FakeCatalogReadRepository implements CatalogReadRepository {

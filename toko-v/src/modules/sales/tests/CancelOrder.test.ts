@@ -22,7 +22,8 @@ import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
 
 import { NotFoundError } from "@/shared/errors/ApplicationError";
-import { use } from "react";
+import { OptimisticLockConflictError } from "@/modules/sales/domain/SalesErrors";
+
 /* ======================================================
    Test Doubles
    ====================================================== */
@@ -34,8 +35,24 @@ class InMemoryOrderRepository implements OrderRepository {
     this.store.set(order.id.toString(), order);
   }
 
-  async findById(id: EntityId): Promise<Order | null> {
+  async findById(id: EntityId, _tx?: unknown): Promise<Order | null> {
     return this.store.get(id.toString()) ?? null;
+  }
+
+  async saveWithVersionCheck(
+    order: Order,
+    expectedVersion: number,
+    _tx?: unknown
+  ): Promise<void> {
+    const existing = this.store.get(order.id.toString());
+    const currentVersion = existing?.getVersion();
+
+    if (currentVersion === undefined || currentVersion !== expectedVersion) {
+      throw new OptimisticLockConflictError();
+    }
+
+    order._incrementVersion();
+    this.store.set(order.id.toString(), order);
   }
 }
 
@@ -50,34 +67,32 @@ class FakeCatalogReadRepository implements CatalogReadRepository {
     },
   ];
 
-  async getProductsByIds(
-    ids: string[]
-  ): Promise<CatalogProductSnapshot[]> {
+  async getProductsByIds(ids: string[]): Promise<CatalogProductSnapshot[]> {
     return this.products.filter((p) => ids.includes(p.productId));
   }
 }
 
 class SpyInventoryService implements InventoryService {
   public issued: IssueStockRequest[] = [];
+  public returned: IssueStockRequest[] = [];
 
   async issueStock(requests: IssueStockRequest[]): Promise<void> {
     this.issued.push(...requests);
   }
 
   async returnStock(requests: IssueStockRequest[]): Promise<void> {
-    this.issued.push(...requests);
+    this.returned.push(...requests);
   }
 }
+
 /* ======================================================
    Tests
    ====================================================== */
 
 describe("CancelOrder Use Case", () => {
-
   let useCase: CancelOrder;
   let orderRepo: InMemoryOrderRepository;
-  let inventoryService: SpyInventoryService; 
-  
+  let inventoryService: SpyInventoryService;
 
   beforeEach(() => {
     orderRepo = new InMemoryOrderRepository();
@@ -90,10 +105,6 @@ describe("CancelOrder Use Case", () => {
   });
 
   it("cancels CREATED order tanpa menyentuh inventory", async () => {
-    const orderRepo = new InMemoryOrderRepository();
-    const inventoryService = new SpyInventoryService();
-
-    // Order CREATED dibuat langsung via domain
     const order = Order.create({
       id: EntityId.of("ORD-300"),
       type: OrderType.OFFLINE,
@@ -113,31 +124,23 @@ describe("CancelOrder Use Case", () => {
 
     await orderRepo.save(order);
 
-    const cancelOrder = new CancelOrder({
-      orderRepo,
-      inventoryService,
-    });
-
-    const result = await cancelOrder.execute({
+    const result = await useCase.execute({
       orderId: "ORD-300",
       canceledBy: "USER-1",
     });
 
     expect(result.status).toBe(OrderStatus.CANCELED);
     expect(inventoryService.issued).toHaveLength(0);
+    expect(inventoryService.returned).toHaveLength(0);
   });
 
   it("cancels PAID order dan mengembalikan stok", async () => {
-    const orderRepo = new InMemoryOrderRepository();
-    const inventoryService = new SpyInventoryService();
-
     const createOrder = new CreateOrder({
       orderRepo,
       catalogReadRepo: new FakeCatalogReadRepository(),
       inventoryService,
     });
 
-    // Buat order PAID
     await createOrder.execute({
       orderId: "ORD-301",
       type: OrderType.OFFLINE,
@@ -146,23 +149,18 @@ describe("CancelOrder Use Case", () => {
       items: [{ productId: "P001", quantity: 2 }],
     });
 
-    // Reset spy karena CreateOrder sudah issue stock
     inventoryService.issued = [];
+    inventoryService.returned = [];
 
-    const cancelOrder = new CancelOrder({
-      orderRepo,
-      inventoryService,
-    });
-
-    const result = await cancelOrder.execute({
+    const result = await useCase.execute({
       orderId: "ORD-301",
       canceledBy: "USER-1",
     });
 
     expect(result.status).toBe(OrderStatus.CANCELED);
-    expect(inventoryService.issued).toHaveLength(1);
+    expect(inventoryService.returned).toHaveLength(1);
 
-    expect(inventoryService.issued[0]).toEqual({
+    expect(inventoryService.returned[0]).toEqual({
       productId: "P001",
       quantity: 2,
       reason: "CANCEL_ORDER",
@@ -175,5 +173,4 @@ describe("CancelOrder Use Case", () => {
       useCase.execute({ orderId: "missing-id", canceledBy: "user-1" })
     ).rejects.toBeInstanceOf(NotFoundError);
   });
-
 });

@@ -19,6 +19,11 @@ export async function seedCreditPaymentHistoryScenario(
   for (const c of cases) {
     const orderId = uid("ORDER");
     const itemId = uid("ITEM");
+    const paymentId = uid("PAY");
+
+    const paidAmount = c.paidAmount ?? c.totalAmount;
+    const outstandingAmount =
+      c.status === "PAID" ? 0 : Math.max(c.totalAmount - paidAmount, 0);
 
     await prisma.order.create({
       data: {
@@ -26,10 +31,10 @@ export async function seedCreditPaymentHistoryScenario(
         type: "OFFLINE",
         status: c.status,
         totalAmount: c.totalAmount,
-        outstandingAmount:
-          c.status === "PAID" ? 0 : c.totalAmount,
+        outstandingAmount,
         createdAt: c.createdAt,
         createdBy: "test-user",
+        version: 0,
         items: {
           create: {
             id: itemId,
@@ -42,14 +47,16 @@ export async function seedCreditPaymentHistoryScenario(
           },
         },
         payments:
-          c.status === "PAID"
+          paidAmount > 0
             ? {
-                create: {
-                  id: uid("PAY"),
-                  amount: c.paidAmount ?? c.totalAmount,
-                  occurredAt: c.createdAt,
-                },
-              }
+              create: {
+                id: paymentId,
+                amount: paidAmount,
+                paidAt: c.createdAt,
+                method: "LEGACY",
+                createdAt: c.createdAt,
+              },
+            }
             : undefined,
       },
     });
