@@ -18,7 +18,7 @@ export async function findCreditPaymentHistory(params: {
 
   const payments = await prisma.payment.findMany({
     where: {
-      occurredAt: {
+      paidAt: {
         gte: from,
         lte: to,
       },
@@ -28,7 +28,7 @@ export async function findCreditPaymentHistory(params: {
     },
     select: {
       amount: true,
-      occurredAt: true,
+      paidAt: true,
       order: {
         select: {
           id: true,
@@ -39,13 +39,13 @@ export async function findCreditPaymentHistory(params: {
       },
     },
     orderBy: {
-      occurredAt: "asc",
+      paidAt: "asc",
     },
   });
 
   return payments.map((p) => ({
     orderId: p.order.id,
-    paymentDate: p.occurredAt,
+    paymentDate: p.paidAt,
     orderDate: p.order.createdAt,
     orderType: p.order.type,
     totalAmount: p.order.totalAmount,

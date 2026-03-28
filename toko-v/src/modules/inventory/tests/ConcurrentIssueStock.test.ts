@@ -111,5 +111,6 @@ describe("Concurrent IssueStock", () => {
 
     expect(repo.getMovements()).toHaveLength(1);
     expect(repo.getMovements()[0].type).toBe("OUT");
+    expect(repo.getMovements()[0].origin).toBe("LEGACY")
   });
 });

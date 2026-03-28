@@ -12,7 +12,7 @@ type Deps = {
 };
 
 export class AdjustStock {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: Deps) { }
 
   async execute(input: AdjustStockInput): Promise<void> {
     const item = await this.deps.inventoryRepo.find(input.productId);
@@ -29,7 +29,8 @@ export class AdjustStock {
     const movement = StockMovement.adjust(
       input.productId,
       Math.abs(input.newQuantity),
-      input.reason
+      input.reason,
+      "MANUAL_ADJUSTMENT"
     );
 
     if (input.newQuantity > 0) {

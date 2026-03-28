@@ -22,6 +22,7 @@ type StockMovementSeed = {
   productId: string;
   occurredAt: Date;
   type: "IN" | "OUT" | "ADJUST";
+  origin: "LEGACY" | "MANUAL_ADJUSTMENT" | "PURCHASE";
   quantity: number;
   reason?: string;
   referenceId?: string;
@@ -50,16 +51,17 @@ export async function seedInventoryReportingScenario(
   if (input.stockMovements?.length) {
     for (const m of input.stockMovements) {
       await db.stockMovement.create({
-      data: {
-        id: m.id ?? randomUUID(), // WAJIB selalu string
-        productId: m.productId,
-        occurredAt: m.occurredAt,
-        type: m.type,
-        quantity: m.quantity,
-        reason: m.reason ?? "seed",
-        referenceId: m.referenceId ?? null,
-      },
-    });
+        data: {
+          id: m.id ?? randomUUID(), // WAJIB selalu string
+          productId: m.productId,
+          occurredAt: m.occurredAt,
+          type: m.type,
+          origin: m.origin,
+          quantity: m.quantity,
+          reason: m.reason ?? "seed",
+          referenceId: m.referenceId ?? null,
+        },
+      });
 
     }
   }

@@ -16,7 +16,7 @@ export async function findSalesSummary(params: {
 
   const payments = await prisma.payment.findMany({
     where: {
-      occurredAt: {
+      paidAt: {
         gte: from,
         lte: to,
       },
@@ -26,7 +26,7 @@ export async function findSalesSummary(params: {
     },
     select: {
       amount: true,
-      occurredAt: true,
+      paidAt: true,
       order: {
         select: {
           type: true,
@@ -39,7 +39,7 @@ export async function findSalesSummary(params: {
   const bucket = new Map<string, SalesSummaryRow>();
 
   for (const p of payments) {
-    const date = p.occurredAt.toISOString().slice(0, 10); // YYYY-MM-DD
+    const date = p.paidAt.toISOString().slice(0, 10); // YYYY-MM-DD
     const key = `${date}|${p.order.type}`;
 
     const current =

@@ -19,6 +19,7 @@ export async function seedCreditOutstandingScenario(
   for (const c of cases) {
     const orderId = uid("ORDER");
     const itemId = uid("ITEM");
+    const paymentId = uid("PAY");
 
     await prisma.order.create({
       data: {
@@ -29,6 +30,7 @@ export async function seedCreditOutstandingScenario(
         outstandingAmount: c.outstandingAmount,
         createdAt: c.createdAt,
         createdBy: "test-user",
+        version: 0,
         items: {
           create: {
             id: itemId,
@@ -43,12 +45,14 @@ export async function seedCreditOutstandingScenario(
         payments:
           c.status === "PAID"
             ? {
-                create: {
-                  id: uid("PAY"),
-                  amount: c.totalAmount,
-                  occurredAt: c.createdAt,
-                },
-              }
+              create: {
+                id: paymentId,
+                amount: c.totalAmount,
+                paidAt: c.createdAt,
+                method: "LEGACY",
+                createdAt: c.createdAt,
+              },
+            }
             : undefined,
       },
     });

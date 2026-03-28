@@ -2,10 +2,16 @@ import { randomUUID } from "crypto";
 
 export type StockMovementType = "IN" | "OUT" | "ADJUST";
 
+export type StockMovementOrigin =
+  | "LEGACY"
+  | "MANUAL_ADJUSTMENT"
+  | "PURCHASE";
+
 type StockMovementProps = {
   id: string;
   productId: string;
   type: StockMovementType;
+  origin: StockMovementOrigin;
   quantity: number;
   reason: string;
   referenceId?: string;
@@ -13,7 +19,7 @@ type StockMovementProps = {
 };
 
 export class StockMovement {
-  private constructor(private readonly props: StockMovementProps) {}
+  private constructor(private readonly props: StockMovementProps) { }
 
   /* ======================================================
      FACTORY METHODS
@@ -23,12 +29,14 @@ export class StockMovement {
     productId: string,
     quantity: number,
     reason: string,
+    origin: StockMovementOrigin,
     referenceId?: string
   ): StockMovement {
     return new StockMovement({
       id: randomUUID(),
       productId,
       type: "IN",
+      origin,
       quantity,
       reason,
       referenceId,
@@ -40,12 +48,14 @@ export class StockMovement {
     productId: string,
     quantity: number,
     reason: string,
+    origin: StockMovementOrigin,
     referenceId?: string
   ): StockMovement {
     return new StockMovement({
       id: randomUUID(),
       productId,
       type: "OUT",
+      origin,
       quantity,
       reason,
       referenceId,
@@ -57,12 +67,14 @@ export class StockMovement {
     productId: string,
     quantity: number,
     reason: string,
+    origin: StockMovementOrigin,
     referenceId?: string
   ): StockMovement {
     return new StockMovement({
       id: randomUUID(),
       productId,
       type: "ADJUST",
+      origin,
       quantity,
       reason,
       referenceId,
@@ -84,6 +96,10 @@ export class StockMovement {
 
   get type(): StockMovementType {
     return this.props.type;
+  }
+
+  get origin(): StockMovementOrigin {
+    return this.props.origin;
   }
 
   get quantity(): number {

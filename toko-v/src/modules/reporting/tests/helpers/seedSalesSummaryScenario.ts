@@ -3,7 +3,8 @@ import { prisma } from "@/shared/prisma";
 type SalesSummarySeedCase = {
   orderType: "OFFLINE" | "ONLINE";
   amount: number;
-  occurredAt: Date;
+  paidAt: Date;
+  createdAt?: Date; // legacy compatibility for old tests
 };
 
 function uid(prefix: string) {
@@ -18,6 +19,15 @@ export async function seedSalesSummaryScenario(
   for (const c of cases) {
     const orderId = uid("ORDER");
     const itemId = uid("ITEM");
+    const paymentId = uid("PAY");
+
+    const timestamp = c.paidAt ?? c.createdAt;
+
+    if (!timestamp) {
+      throw new Error(
+        "seedSalesSummaryScenario requires paidAt or createdAt",
+      );
+    }
 
     await prisma.order.create({
       data: {
@@ -26,8 +36,9 @@ export async function seedSalesSummaryScenario(
         status: "PAID",
         totalAmount: c.amount,
         outstandingAmount: 0,
-        createdAt: c.occurredAt,
+        createdAt: timestamp,
         createdBy: "test-user",
+        version: 0,
         items: {
           create: {
             id: itemId,
@@ -41,9 +52,11 @@ export async function seedSalesSummaryScenario(
         },
         payments: {
           create: {
-            id: uid("PAY"),
+            id: paymentId,
             amount: c.amount,
-            occurredAt: c.occurredAt,
+            paidAt: timestamp,
+            method: "LEGACY",
+            createdAt: timestamp,
           },
         },
       },
