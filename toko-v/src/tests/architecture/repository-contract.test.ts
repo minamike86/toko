@@ -4,13 +4,11 @@ import { InventoryRepository } from "@/modules/inventory/domain/InventoryReposit
 import { InventoryItem } from "@/modules/inventory/domain/InventoryItem";
 
 describe("InventoryRepository contract", () => {
-  it("find returns InventoryItem | null", async () => {
+  it("findByVariantId returns InventoryItem | null", async () => {
     type FindReturn = Awaited<
-      ReturnType<InventoryRepository["find"]>
+      ReturnType<InventoryRepository["findByVariantId"]>
     >;
 
-    expectTypeOf<FindReturn>().toEqualTypeOf<
-      InventoryItem | null
-    >();
+    expectTypeOf<FindReturn>().toEqualTypeOf<InventoryItem | null>();
   });
 });

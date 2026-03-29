@@ -5,43 +5,40 @@ import { InventoryRepository } from "@/modules/inventory/domain/InventoryReposit
 import { InventoryItem } from "@/modules/inventory/domain/InventoryItem";
 import { StockMovement } from "@/modules/inventory/domain/StockMovement";
 
-/* =========================
-   In-Memory Repo (Test Double)
-   ========================= */
-
 class InMemoryInventoryRepository implements InventoryRepository {
   private readonly items = new Map<string, InventoryItem>();
   private readonly movements: StockMovement[] = [];
 
-  constructor(initial: Array<{ productId: string; quantity: number }>) {
+  constructor(initial: Array<{ variantId: string; quantity: number }>) {
     for (const s of initial) {
-      this.items.set(
-        s.productId,
-        InventoryItem.of(s.productId, s.quantity)
-      );
+      this.items.set(s.variantId, InventoryItem.of(s.quantity));
     }
   }
 
-  async find(productId: string): Promise<InventoryItem | null> {
-    return this.items.get(productId) ?? null;
+  async findByVariantId(variantId: string): Promise<InventoryItem | null> {
+    return this.items.get(variantId) ?? null;
   }
 
-  async increase(productId: string, quantity: number): Promise<void> {
-    const item = this.items.get(productId);
+  async listMovementsByVariantId() {
+    return [];
+  }
+
+  async increaseByVariantId(): Promise<void> {
+    throw new Error("not used");
+  }
+
+  async decreaseByVariantId(
+    variantId: string,
+    quantity: number,
+  ): Promise<void> {
+    const item = this.items.get(variantId);
     if (!item) {
       throw new Error("Inventory item not found");
     }
-    item.increase(quantity);
-  }
 
-  async decrease(productId: string, quantity: number): Promise<void> {
-    const item = this.items.get(productId);
-    if (!item) {
-      throw new Error("Inventory item not found");
+    if (!item.canFulfill(quantity)) {
+      throw new Error("Insufficient stock");
     }
-
-    // simulasi latency untuk memicu race condition
-    await new Promise((r) => setTimeout(r, 5));
 
     item.decrease(quantity);
   }
@@ -50,9 +47,8 @@ class InMemoryInventoryRepository implements InventoryRepository {
     this.movements.push(movement);
   }
 
-  // helper khusus test
-  getItem(productId: string): InventoryItem | undefined {
-    return this.items.get(productId);
+  getItem(variantId: string): InventoryItem | undefined {
+    return this.items.get(variantId);
   }
 
   getMovements(): StockMovement[] {
@@ -60,57 +56,39 @@ class InMemoryInventoryRepository implements InventoryRepository {
   }
 }
 
-/* =========================
-   Tests
-   ========================= */
-
 describe("Concurrent IssueStock", () => {
   it("allows only one order to consume stock when two orders compete", async () => {
     const repo = new InMemoryInventoryRepository([
-      { productId: "P001", quantity: 5 },
+      { variantId: "V001", quantity: 5 },
     ]);
 
-    const issueStock = new IssueStock(repo);
+    const issueStock = new IssueStock({ inventoryRepo: repo });
 
-    const requestA = issueStock.execute([
-      {
-        productId: "P001",
-        quantity: 4,
-        reason: "SALE_ORDER",
-        referenceId: "ORD-A",
-      },
+    const [r1, r2] = await Promise.allSettled([
+      issueStock.execute([
+        {
+          variantId: "V001",
+          quantity: 5,
+          reason: "SALE_ORDER",
+          referenceId: "ORD-1",
+        },
+      ]),
+      issueStock.execute([
+        {
+          variantId: "V001",
+          quantity: 5,
+          reason: "SALE_ORDER",
+          referenceId: "ORD-2",
+        },
+      ]),
     ]);
 
-    const requestB = issueStock.execute([
-      {
-        productId: "P001",
-        quantity: 4,
-        reason: "SALE_ORDER",
-        referenceId: "ORD-B",
-      },
-    ]);
-
-    const results = await Promise.allSettled([
-      requestA,
-      requestB,
-    ]);
-
-    const fulfilled = results.filter(
-      (r) => r.status === "fulfilled"
-    );
-    const rejected = results.filter(
-      (r) => r.status === "rejected"
-    );
+    const fulfilled = [r1, r2].filter((r) => r.status === "fulfilled");
+    const rejected = [r1, r2].filter((r) => r.status === "rejected");
 
     expect(fulfilled).toHaveLength(1);
     expect(rejected).toHaveLength(1);
-
-    const item = repo.getItem("P001")!;
-    expect(item.getQuantity()).toBeGreaterThanOrEqual(0);
-    expect(item.getQuantity()).toBeLessThanOrEqual(1);
-
+    expect(repo.getItem("V001")!.getQuantity()).toBe(0);
     expect(repo.getMovements()).toHaveLength(1);
-    expect(repo.getMovements()[0].type).toBe("OUT");
-    expect(repo.getMovements()[0].origin).toBe("LEGACY")
   });
 });

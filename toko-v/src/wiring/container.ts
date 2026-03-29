@@ -46,52 +46,72 @@ export const inventoryRepo = new PrismaInventoryRepository(prisma);
    ====================== */
 
 // OUT (SALE / RESERVE)
-const issueStock = new IssueStock(inventoryRepo);
+const issueStock = new IssueStock({ inventoryRepo });
 
 // IN (CANCEL / RETURN)
-const receiveStock = new ReceiveStock(inventoryRepo);
+const receiveStock = new ReceiveStock({ inventoryRepo });
 
 /* ======================
    INVENTORY SERVICE (PORT ADAPTER)
    ====================== */
 
 export const inventoryService = new InventoryServiceAdapter(
-  issueStock,
-  receiveStock
+   issueStock,
+   receiveStock
 );
 
 /* ======================
    CATALOG REPO (TEMP / MVP)
    ====================== */
 
-export const catalogReadRepo = new InMemoryCatalogReadRepository([
-  {
-    productId: "P001",
-    name: "Produk A",
-    unit: "pcs",
-    price: 10000,
-    isActive: true,
-  },
-  {
-    productId: "P002",
-    name: "Produk B",
-    unit: "pcs",
-    price: 20000,
-    isActive: true,
-  },
-]);
+export const catalogReadRepo = new InMemoryCatalogReadRepository(
+   [
+      {
+         productId: "P001",
+         name: "Produk A",
+         unit: "pcs",
+         price: 10000,
+         isActive: true,
+      },
+      {
+         productId: "P002",
+         name: "Produk B",
+         unit: "pcs",
+         price: 20000,
+         isActive: true,
+      },
+   ],
+   [
+      {
+         variantId: "V001",
+         productId: "P001",
+         productName: "Produk A",
+         unit: "pcs",
+         price: 10000,
+         isActive: true,
+      },
+      {
+         variantId: "V002",
+         productId: "P002",
+         productName: "Produk B",
+         unit: "pcs",
+         price: 20000,
+         isActive: true,
+      },
+   ]
+);
 
 /* ======================
    SALES USE CASES
    ====================== */
 
 export const createOrder = new CreateOrder({
-  orderRepo,
-  catalogReadRepo,
-  inventoryService,
+   orderRepo,
+   catalogReadRepo,
+   inventoryService,
 });
 
 export const cancelOrder = new CancelOrder({
-  orderRepo,
-  inventoryService,
+   orderRepo,
+   inventoryService,
 });

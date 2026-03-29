@@ -1,30 +1,51 @@
-// inventory-low-stock-query.ts
-
 import { prisma } from "@/shared/prisma";
-import type { InventoryLowStockDTO } from "@/modules/reporting/dto/inventory-low-stock.dto"
 
+export type InventoryLowStockRow = {
+  productId: string;
+  variantId: string;
+  quantity: number;
+};
 
-export async function findInventoryLowStock(input: {
-  threshold: number;
-}): Promise<InventoryLowStockDTO[]> {
-  if (input.threshold < 0) return [];
+type FindInventoryLowStockInput =
+  | number
+  | {
+    threshold: number;
+  };
+
+export async function findInventoryLowStock(
+  input: FindInventoryLowStockInput,
+): Promise<InventoryLowStockRow[]> {
+  const threshold = typeof input === "number" ? input : input.threshold;
 
   const rows = await prisma.inventoryItem.findMany({
     where: {
-      quantity: { lte: input.threshold },
+      quantity: {
+        lte: threshold,
+      },
     },
-    orderBy: [
-      { quantity: "asc" },
-      { productId: "asc" },
-    ],
+    orderBy: [{ quantity: "asc" }, { variantId: "asc" }],
     select: {
-      productId: true,
+      variantId: true,
       quantity: true,
+      variant: {
+        select: {
+          productId: true,
+        },
+      },
     },
   });
 
-  return rows.map((row) => ({
-    productId: row.productId,
-    currentStockQuantity: row.quantity,
-  }));
+  return rows.map((row) => {
+    if (!row.variant) {
+      throw new Error(
+        `Inventory low stock query found inventory item without related variant: ${row.variantId}`,
+      );
+    }
+
+    return {
+      productId: row.variant.productId,
+      variantId: row.variantId,
+      quantity: row.quantity,
+    };
+  });
 }

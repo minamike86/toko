@@ -38,6 +38,7 @@ export class PrismaOrderRepository implements OrderRepository {
           create: order.items.map((item) => ({
             id: item.id.toString(),
             productId: item.productId.toString(),
+            variantId: item.variantId.toString(),
             productNameSnapshot: item.productNameSnapshot,
             unitSnapshot: item.unitSnapshot,
             unitPriceSnapshot: item.unitPriceSnapshot.get(),
@@ -134,16 +135,23 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 
   private toDomain(data: OrderWithItemsRow): Order {
-    const items = data.items.map((row) =>
-      OrderItem.create({
+    const items = data.items.map((row) => {
+      if (!row.variantId) {
+        throw new Error(
+          `OrderItem.variantId kosong pada row ${row.id}. Phase B seharusnya sudah backfill.`,
+        );
+      }
+
+      return OrderItem.create({
         id: EntityId.of(row.id),
         productId: EntityId.of(row.productId),
+        variantId: EntityId.of(row.variantId),
         productNameSnapshot: row.productNameSnapshot,
         unitSnapshot: row.unitSnapshot,
         unitPriceSnapshot: Money.of(row.unitPriceSnapshot),
         quantity: PositiveInt.of(row.quantity),
-      }),
-    );
+      });
+    });
 
     return Order.reconstitute({
       id: EntityId.of(data.id),

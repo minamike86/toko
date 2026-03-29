@@ -2,7 +2,7 @@ import { InventoryRepository } from "../domain/InventoryRepository";
 import { StockMovement } from "../domain/StockMovement";
 
 export type AdjustStockInput = {
-  productId: string;
+  variantId: string;
   newQuantity: number;
   reason: string;
 };
@@ -15,35 +15,38 @@ export class AdjustStock {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: AdjustStockInput): Promise<void> {
-    const item = await this.deps.inventoryRepo.find(input.productId);
-
-    if (!item) {
-      throw new Error(`Inventory tidak ditemukan: ${input.productId}`);
+    if (input.newQuantity < 0) {
+      throw new Error(`newQuantity tidak boleh negatif: ${input.newQuantity}`);
     }
 
-    if (input.newQuantity === 0) {
-      // koreksi nol tidak bermakna, tapi ini keputusan eksplisit
+    const item = await this.deps.inventoryRepo.findByVariantId(input.variantId);
+
+    if (!item) {
+      throw new Error(`Inventory tidak ditemukan: ${input.variantId}`);
+    }
+
+    const currentQuantity = item.getQuantity();
+    const delta = input.newQuantity - currentQuantity;
+
+    if (delta === 0) {
       return;
     }
 
-    const movement = StockMovement.adjust(
-      input.productId,
-      Math.abs(input.newQuantity),
-      input.reason,
-      "MANUAL_ADJUSTMENT"
-    );
-
-    if (input.newQuantity > 0) {
-      await this.deps.inventoryRepo.increase(
-        input.productId,
-        input.newQuantity
-      );
+    if (delta > 0) {
+      await this.deps.inventoryRepo.increaseByVariantId(input.variantId, delta);
     } else {
-      await this.deps.inventoryRepo.decrease(
-        input.productId,
-        Math.abs(input.newQuantity)
+      await this.deps.inventoryRepo.decreaseByVariantId(
+        input.variantId,
+        Math.abs(delta),
       );
     }
+
+    const movement = StockMovement.adjust({
+      variantId: input.variantId,
+      quantity: Math.abs(delta),
+      reason: input.reason,
+      origin: "MANUAL_ADJUSTMENT",
+    });
 
     await this.deps.inventoryRepo.saveMovement(movement);
   }

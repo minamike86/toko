@@ -10,6 +10,7 @@ import { OrderType } from "@/modules/sales/domain/OrderType";
 import {
   CatalogReadRepository,
   CatalogProductSnapshot,
+  CatalogVariantReadModel,
 } from "@/modules/catalog/domain/CatalogReadRepository";
 
 import {
@@ -67,8 +68,23 @@ class FakeCatalogReadRepository implements CatalogReadRepository {
     },
   ];
 
+  private readonly variants: CatalogVariantReadModel[] = [
+    {
+      variantId: "V001",
+      productId: "P001",
+      productName: "Produk Test",
+      unit: "pcs",
+      price: 10000,
+      isActive: true,
+    },
+  ];
+
   async getProductsByIds(ids: string[]): Promise<CatalogProductSnapshot[]> {
     return this.products.filter((p) => ids.includes(p.productId));
+  }
+
+  async getVariantsByIds(ids: string[]): Promise<CatalogVariantReadModel[]> {
+    return this.variants.filter((v) => ids.includes(v.variantId));
   }
 }
 
@@ -112,6 +128,7 @@ describe("CancelOrder Use Case", () => {
         OrderItem.create({
           id: EntityId.of("ITEM-1"),
           productId: EntityId.of("P001"),
+          variantId: EntityId.of("V001"),
           productNameSnapshot: "Produk Test",
           unitSnapshot: "pcs",
           unitPriceSnapshot: Money.of(10000),
@@ -146,7 +163,7 @@ describe("CancelOrder Use Case", () => {
       type: OrderType.OFFLINE,
       payment: "CASH",
       createdBy: "USER-1",
-      items: [{ productId: "P001", quantity: 2 }],
+      items: [{ variantId: "V001", quantity: 2 }],
     });
 
     inventoryService.issued = [];
@@ -161,7 +178,7 @@ describe("CancelOrder Use Case", () => {
     expect(inventoryService.returned).toHaveLength(1);
 
     expect(inventoryService.returned[0]).toEqual({
-      productId: "P001",
+      variantId: "V001",
       quantity: 2,
       reason: "CANCEL_ORDER",
       referenceId: "ORD-301",

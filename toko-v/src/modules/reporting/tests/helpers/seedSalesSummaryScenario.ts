@@ -4,13 +4,50 @@ type SalesSummarySeedCase = {
   orderType: "OFFLINE" | "ONLINE";
   amount: number;
   paidAt: Date;
-  createdAt?: Date; // legacy compatibility for old tests
+  createdAt?: Date;
 };
 
 function uid(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function ensureProductVariant(productId: string, variantId: string, price: number) {
+  await prisma.product.upsert({
+    where: { id: productId },
+    update: {
+      name: "Test Product",
+      isActive: true,
+    },
+    create: {
+      id: productId,
+      name: "Test Product",
+      brand: null,
+      isActive: true,
+    },
+  });
+
+  await prisma.productVariant.upsert({
+    where: { id: variantId },
+    update: {
+      productId,
+      sku: `SKU-${variantId}`,
+      variantName: "Default",
+      unit: "pcs",
+      basePrice: price,
+      isActive: true,
+    },
+    create: {
+      id: variantId,
+      productId,
+      sku: `SKU-${variantId}`,
+      variantName: "Default",
+      unit: "pcs",
+      sizeLabel: null,
+      colorLabel: null,
+      basePrice: price,
+      isActive: true,
+    },
+  });
 }
 
 export async function seedSalesSummaryScenario(
@@ -20,14 +57,16 @@ export async function seedSalesSummaryScenario(
     const orderId = uid("ORDER");
     const itemId = uid("ITEM");
     const paymentId = uid("PAY");
+    const productId = uid("P");
+    const variantId = uid("V");
 
     const timestamp = c.paidAt ?? c.createdAt;
 
     if (!timestamp) {
-      throw new Error(
-        "seedSalesSummaryScenario requires paidAt or createdAt",
-      );
+      throw new Error("seedSalesSummaryScenario requires paidAt or createdAt");
     }
+
+    await ensureProductVariant(productId, variantId, c.amount);
 
     await prisma.order.create({
       data: {
@@ -42,7 +81,8 @@ export async function seedSalesSummaryScenario(
         items: {
           create: {
             id: itemId,
-            productId: uid("P"),
+            productId,
+            variantId,
             productNameSnapshot: "Test Product",
             unitSnapshot: "pcs",
             unitPriceSnapshot: c.amount,

@@ -16,16 +16,22 @@ import {
 
 import { InactiveProductError } from "../domain/SalesErrors";
 
-/**
- * Application-level error: entity tidak ditemukan (bukan domain invariant).
- * Dibuat lokal agar patch ini tidak memerlukan file baru.
- */
 export class NotFoundError extends Error {
   readonly name = "NotFoundError";
+
   constructor(public readonly entity: string, public readonly id: string) {
     super(`${entity} not found: ${id}`);
   }
 }
+
+type CatalogVariantView = {
+  variantId: string;
+  productId: string;
+  productName: string;
+  unit: string;
+  price: number;
+  isActive: boolean;
+};
 
 export type CreateOrderInput = {
   orderId: string;
@@ -33,7 +39,7 @@ export type CreateOrderInput = {
   payment: "CASH" | "CREDIT";
   createdBy: string;
   items: Array<{
-    productId: string;
+    variantId: string;
     quantity: number;
   }>;
 };
@@ -52,32 +58,33 @@ type Deps = {
 };
 
 export class CreateOrder {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: Deps) { }
 
   async execute(input: CreateOrderInput): Promise<CreateOrderResult> {
-    const products = await this.deps.catalogReadRepo.getProductsByIds(
-      input.items.map((i) => i.productId)
+    const variants = await this.deps.catalogReadRepo.getVariantsByIds(
+      input.items.map((i) => i.variantId)
     );
 
-    const productMap = new Map(products.map((p) => [p.productId, p]));
+    const variantMap = new Map(variants.map((v) => [v.variantId, v]));
 
     const orderItems = input.items.map((line) => {
-      const product = productMap.get(line.productId);
-      if (!product) {
-        // Not Found adalah concern application, bukan domain invariant
-        throw new NotFoundError("Product", line.productId);
+      const variant = variantMap.get(line.variantId);
+
+      if (!variant) {
+        throw new NotFoundError("ProductVariant", line.variantId);
       }
 
-      if (!product.isActive) {
-        throw new InactiveProductError(product.productId);
+      if (!variant.isActive) {
+        throw new InactiveProductError(variant.productId);
       }
 
       return OrderItem.create({
-        id: EntityId.of(`${input.orderId}:${product.productId}`),
-        productId: EntityId.of(product.productId),
-        productNameSnapshot: product.name,
-        unitSnapshot: product.unit,
-        unitPriceSnapshot: Money.of(product.price),
+        id: EntityId.of(`${input.orderId}:${variant.variantId}`),
+        productId: EntityId.of(variant.productId),
+        variantId: EntityId.of(variant.variantId),
+        productNameSnapshot: variant.productName,
+        unitSnapshot: variant.unit,
+        unitPriceSnapshot: Money.of(variant.price),
         quantity: PositiveInt.of(line.quantity),
       });
     });
@@ -90,12 +97,11 @@ export class CreateOrder {
       createdBy: EntityId.of(input.createdBy),
     });
 
-    // simpan fakta awal (CREATED)
     await this.deps.orderRepo.save(order);
 
     try {
       const requests: IssueStockRequest[] = orderItems.map((item) => ({
-        productId: item.productId.toString(),
+        variantId: item.variantId.toString(),
         quantity: item.quantity.get(),
         reason: "SALE_ORDER",
         referenceId: order.id.toString(),
@@ -103,13 +109,11 @@ export class CreateOrder {
 
       await this.deps.inventoryService.issueStock(requests);
     } catch (error) {
-      // inventory gagal → order FAILED
       order.markAsFailed();
       await this.deps.orderRepo.save(order);
       throw error;
     }
 
-    // inventory berhasil → baru tentukan status pembayaran
     if (input.payment === "CASH") {
       order.markAsPaid();
     } else {

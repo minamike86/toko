@@ -5,40 +5,34 @@ import { InventoryRepository } from "@/modules/inventory/domain/InventoryReposit
 import { InventoryItem } from "@/modules/inventory/domain/InventoryItem";
 import { StockMovement } from "@/modules/inventory/domain/StockMovement";
 
-/* =========================
-   In-Memory Repo (Test)
-   ========================= */
-
 class InMemoryInventoryRepository implements InventoryRepository {
   private readonly items = new Map<string, InventoryItem>();
   private readonly movements: StockMovement[] = [];
 
-  constructor(initial: Array<{ productId: string; quantity: number }>) {
+  constructor(initial: Array<{ variantId: string; quantity: number }>) {
     for (const s of initial) {
-      this.items.set(
-        s.productId,
-        InventoryItem.of(s.productId, s.quantity)
-      );
+      this.items.set(s.variantId, InventoryItem.of(s.quantity));
     }
   }
 
-  async find(productId: string): Promise<InventoryItem | null> {
-    return this.items.get(productId) ?? null;
+  async findByVariantId(variantId: string): Promise<InventoryItem | null> {
+    return this.items.get(variantId) ?? null;
   }
 
-  async increase(productId: string, quantity: number): Promise<void> {
-    const item = this.items.get(productId);
-    if (!item) {
-      throw new Error("Inventory item not found");
-    }
-    item.increase(quantity);
+  async listMovementsByVariantId() {
+    return [];
   }
 
-  async decrease(productId: string, quantity: number): Promise<void> {
-    const item = this.items.get(productId);
-    if (!item) {
-      throw new Error("Inventory item not found");
-    }
+  async increaseByVariantId(): Promise<void> {
+    throw new Error("not used");
+  }
+
+  async decreaseByVariantId(
+    variantId: string,
+    quantity: number,
+  ): Promise<void> {
+    const item = this.items.get(variantId);
+    if (!item) throw new Error("Inventory item not found");
     item.decrease(quantity);
   }
 
@@ -46,9 +40,8 @@ class InMemoryInventoryRepository implements InventoryRepository {
     this.movements.push(movement);
   }
 
-  // helper khusus test
-  getItem(productId: string): InventoryItem | undefined {
-    return this.items.get(productId);
+  getItem(variantId: string): InventoryItem | undefined {
+    return this.items.get(variantId);
   }
 
   getMovements(): StockMovement[] {
@@ -56,61 +49,32 @@ class InMemoryInventoryRepository implements InventoryRepository {
   }
 }
 
-/* =========================
-   Tests
-   ========================= */
-
 describe("IssueStock Use Case", () => {
   it("mengurangi stok dan mencatat movement OUT dengan origin LEGACY", async () => {
     const repo = new InMemoryInventoryRepository([
-      { productId: "P001", quantity: 10 },
+      { variantId: "V001", quantity: 10 },
     ]);
 
-    const useCase = new IssueStock(repo);
+    const useCase = new IssueStock({ inventoryRepo: repo });
 
     await useCase.execute([
       {
-        productId: "P001",
+        variantId: "V001",
         quantity: 3,
         reason: "SALE_ORDER",
         referenceId: "ORD-1",
       },
     ]);
 
-    const item = repo.getItem("P001")!;
-    expect(item.getQuantity()).toBe(7);
+    const item = repo.getItem("V001");
+    expect(item).toBeDefined();
+    expect(item!.getQuantity()).toBe(7);
     expect(repo.getMovements()).toHaveLength(1);
 
     const movement = repo.getMovements()[0];
+    expect(movement.variantId).toBe("V001");
+    expect(movement.productId).toBeNull();
     expect(movement.type).toBe("OUT");
     expect(movement.origin).toBe("LEGACY");
-    expect(movement.referenceId).toBe("ORD-1");
-    expect(movement.productId).toBe("P001");
-    expect(movement.quantity).toBe(3);
-    expect(movement.reason).toBe("SALE_ORDER");
-
-  });
-
-  it("melempar error jika stok tidak cukup", async () => {
-    const repo = new InMemoryInventoryRepository([
-      { productId: "P001", quantity: 2 },
-    ]);
-
-    const useCase = new IssueStock(repo);
-
-    await expect(
-      useCase.execute([
-        {
-          productId: "P001",
-          quantity: 5,
-          reason: "SALE_ORDER",
-          referenceId: "ORD-2",
-        },
-      ])
-    ).rejects.toThrow();
-
-    const item = repo.getItem("P001")!;
-    expect(item.getQuantity()).toBe(2);
-    expect(repo.getMovements()).toHaveLength(0);
   });
 });

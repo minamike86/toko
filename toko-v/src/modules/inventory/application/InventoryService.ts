@@ -1,13 +1,20 @@
 export type IssueStockRequest = {
-  productId: string;
-  quantity: number; // positif
-  reason: string;   // misal "SALE_ORDER"
-  referenceId: string; // orderId untuk audit
+  variantId: string;
+  quantity: number;
+  reason: string;
+  referenceId: string;
+};
+
+export type ReceiveStockRequest = {
+  variantId: string;
+  quantity: number;
+  reason: string;
+  referenceId?: string;
 };
 
 export class InsufficientStockError extends Error {
-  constructor(productId: string) {
-    super(`Stok tidak mencukupi untuk product ${productId}.`);
+  constructor(variantId: string) {
+    super(`Stok tidak mencukupi untuk variant ${variantId}.`);
     this.name = "InsufficientStockError";
   }
 }

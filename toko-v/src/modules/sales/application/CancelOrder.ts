@@ -42,7 +42,7 @@ type Deps = {
 
 
 export class CancelOrder {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: Deps) { }
 
   async execute(input: CancelOrderInput): Promise<CancelOrderResult> {
     const useCaseName = "CancelOrder";
@@ -76,7 +76,7 @@ export class CancelOrder {
     ) {
       await this.deps.inventoryService.returnStock(
         order.items.map((item) => ({
-          productId: item.productId.toString(),
+          variantId: item.variantId.toString(),
           quantity: item.quantity.get(),
           reason: "CANCEL_ORDER",
           referenceId: order.id.toString(),

@@ -9,7 +9,8 @@ export type StockMovementOrigin =
 
 type StockMovementProps = {
   id: string;
-  productId: string;
+  productId?: string | null;
+  variantId: string;
   type: StockMovementType;
   origin: StockMovementOrigin;
   quantity: number;
@@ -18,79 +19,69 @@ type StockMovementProps = {
   occurredAt: Date;
 };
 
+type CreateStockMovementParams = {
+  variantId: string;
+  productId?: string | null;
+  quantity: number;
+  reason: string;
+  origin: StockMovementOrigin;
+  referenceId?: string;
+};
+
 export class StockMovement {
   private constructor(private readonly props: StockMovementProps) { }
 
-  /* ======================================================
-     FACTORY METHODS
-     ====================================================== */
-
-  static in(
-    productId: string,
-    quantity: number,
-    reason: string,
-    origin: StockMovementOrigin,
-    referenceId?: string
-  ): StockMovement {
+  static in(params: CreateStockMovementParams): StockMovement {
     return new StockMovement({
       id: randomUUID(),
-      productId,
+      variantId: params.variantId,
+      productId: params.productId ?? null,
       type: "IN",
-      origin,
-      quantity,
-      reason,
-      referenceId,
+      origin: params.origin,
+      quantity: params.quantity,
+      reason: params.reason,
+      referenceId: params.referenceId,
       occurredAt: new Date(),
     });
   }
 
-  static out(
-    productId: string,
-    quantity: number,
-    reason: string,
-    origin: StockMovementOrigin,
-    referenceId?: string
-  ): StockMovement {
+  static out(params: CreateStockMovementParams): StockMovement {
     return new StockMovement({
       id: randomUUID(),
-      productId,
+      variantId: params.variantId,
+      productId: params.productId ?? null,
       type: "OUT",
-      origin,
-      quantity,
-      reason,
-      referenceId,
+      origin: params.origin,
+      quantity: params.quantity,
+      reason: params.reason,
+      referenceId: params.referenceId,
       occurredAt: new Date(),
     });
   }
 
-  static adjust(
-    productId: string,
-    quantity: number,
-    reason: string,
-    origin: StockMovementOrigin,
-    referenceId?: string
-  ): StockMovement {
+  static adjust(params: CreateStockMovementParams): StockMovement {
     return new StockMovement({
       id: randomUUID(),
-      productId,
+      variantId: params.variantId,
+      productId: params.productId ?? null,
       type: "ADJUST",
-      origin,
-      quantity,
-      reason,
-      referenceId,
+      origin: params.origin,
+      quantity: params.quantity,
+      reason: params.reason,
+      referenceId: params.referenceId,
       occurredAt: new Date(),
     });
   }
-
-  /* ======================================================
-     GETTERS (READ-ONLY)
-     ====================================================== */
 
   get id(): string {
     return this.props.id;
   }
 
-  get productId(): string {
+  get variantId(): string {
+    return this.props.variantId;
+  }
+
+  get productId(): string | null | undefined {
     return this.props.productId;
   }
 

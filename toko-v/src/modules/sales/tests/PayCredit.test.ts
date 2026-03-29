@@ -36,7 +36,11 @@ describe("PayCredit", () => {
     orderRepository = new InMemoryOrderRepository();
     paymentRepository = new InMemoryPaymentRepository();
     fakeTransactionRunner = new FakeTransactionRunner();
-    payCredit = new PayCredit(orderRepository, paymentRepository, fakeTransactionRunner);
+    payCredit = new PayCredit(
+      orderRepository,
+      paymentRepository,
+      fakeTransactionRunner
+    );
   });
 
   it("throws NotFoundError when order does not exist", async () => {
@@ -47,7 +51,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -70,7 +74,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(InvalidPaymentAmountError);
   });
 
@@ -80,7 +84,7 @@ describe("PayCredit", () => {
     const order = Order.create({
       id: EntityId.of(orderId),
       type: OrderType.OFFLINE,
-      items: [createDummyOrderItem(orderId)],
+      items: [createDummyOrderItem({ orderId })],
       createdAt: new Date(),
       createdBy: EntityId.of("user-1"),
     });
@@ -94,7 +98,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(OrderNotOnCreditError);
   });
 
@@ -119,7 +123,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "TRANSFER",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(OrderNotOnCreditError);
   });
 
@@ -129,7 +133,7 @@ describe("PayCredit", () => {
     const order = Order.create({
       id: EntityId.of(orderId),
       type: OrderType.OFFLINE,
-      items: [createDummyOrderItem(orderId)],
+      items: [createDummyOrderItem({ orderId })],
       createdAt: new Date(),
       createdBy: EntityId.of("user-1"),
     });
@@ -144,7 +148,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(OrderNotOnCreditError);
   });
 
@@ -227,7 +231,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(PaymentOverpayError);
   });
 
@@ -258,7 +262,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "TRANSFER",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(PaymentOverpayError);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));

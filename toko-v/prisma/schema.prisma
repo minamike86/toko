@@ -8,6 +8,42 @@ generator client {
 }
 
 /* ======================================================
+   Produk DOMAIN
+   ====================================================== */
+
+model Product {
+  id        String   @id
+  name      String
+  brand     String?
+  isActive  Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants  ProductVariant[]
+}
+
+model ProductVariant {
+  id          String   @id
+  productId   String
+  sku         String   @unique
+  variantName String
+  unit        String
+  sizeLabel   String?
+  colorLabel  String?
+  basePrice   Int
+  isActive    Boolean
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product         Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  inventoryItems  InventoryItem[]
+  orderItems      OrderItem[]
+  stockMovements  StockMovement[]
+
+  @@index([productId])
+}
+
+/* ======================================================
    SALES DOMAIN
    ====================================================== */
 
@@ -35,6 +71,7 @@ model OrderItem {
   orderId              String
 
   productId            String
+  variantId           String?
   productNameSnapshot  String
   unitSnapshot         String
   unitPriceSnapshot    Int
@@ -42,9 +79,11 @@ model OrderItem {
   subtotal             Int
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@index([productId])
+  @@index([variantId])
  
 }
 
@@ -52,17 +91,21 @@ model OrderItem {
    INVENTORY DOMAIN
    ====================================================== */
 
-model InventoryItem {
-  productId String @id
+model InventoryItem {  
+  variantId String @id
   quantity  Int
 
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
   @@index([quantity])
+  
  
 }
 
 model StockMovement {
   id          String   @id
   productId   String
+  variantId   String?
   type        String   // IN | OUT | ADJUST
   origin      String   // LEGACY | MANUAL_ADJUSTMENT | PURCHASE
   quantity    Int
@@ -70,7 +113,10 @@ model StockMovement {
   referenceId String?
   occurredAt  DateTime
 
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
   @@index([productId])
+  @@index([variantId])
   @@index([referenceId])
   @@index([occurredAt])
 }

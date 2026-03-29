@@ -1,21 +1,38 @@
 import { prisma } from "@/shared/prisma";
-import type { InventorySnapshotReportRow } from "@/modules/reporting/dto/inventory-snapshot-report.dto";
+
+export type InventorySnapshotRow = {
+  variantId: string;
+  productId: string;
+  quantity: number;
+};
 
 export async function findInventorySnapshot(): Promise<
-  InventorySnapshotReportRow[]
+  InventorySnapshotRow[]
 > {
   const rows = await prisma.inventoryItem.findMany({
+    orderBy: [{ variantId: "asc" }],
     select: {
-      productId: true,
+      variantId: true,
       quantity: true,
-    },
-    orderBy: {
-      productId: "asc",
+      variant: {
+        select: {
+          productId: true,
+        },
+      },
     },
   });
 
-  return rows.map((row) => ({
-    productId: row.productId,
-    currentStockQuantity: row.quantity,
-  }));
+  return rows.map((row) => {
+    if (!row.variant) {
+      throw new Error(
+        `Inventory snapshot query found inventory item without related variant: ${row.variantId}`,
+      );
+    }
+
+    return {
+      variantId: row.variantId,
+      productId: row.variant.productId,
+      quantity: row.quantity,
+    };
+  });
 }

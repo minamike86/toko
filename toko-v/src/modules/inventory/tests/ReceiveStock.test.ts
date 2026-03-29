@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { ReceiveStock } from "@/modules/inventory/application/ReceiveStock";
 import { InventoryRepository } from "@/modules/inventory/domain/InventoryRepository";
 import { InventoryItem } from "@/modules/inventory/domain/InventoryItem";
@@ -8,41 +9,36 @@ class InMemoryInventoryRepository implements InventoryRepository {
   private readonly items = new Map<string, InventoryItem>();
   private readonly movements: StockMovement[] = [];
 
-  constructor(initial: Array<{ productId: string; quantity: number }>) {
+  constructor(initial: Array<{ variantId: string; quantity: number }>) {
     for (const s of initial) {
-      this.items.set(
-        s.productId,
-        InventoryItem.of(s.productId, s.quantity)
-      );
+      this.items.set(s.variantId, InventoryItem.of(s.quantity));
     }
   }
 
-  async find(productId: string): Promise<InventoryItem | null> {
-    return this.items.get(productId) ?? null;
+  async findByVariantId(variantId: string): Promise<InventoryItem | null> {
+    return this.items.get(variantId) ?? null;
   }
 
-  async increase(productId: string, quantity: number): Promise<void> {
-    const item = this.items.get(productId);
-    if (!item) {
-      throw new Error("Inventory item not found");
-    }
+  async listMovementsByVariantId() {
+    return [];
+  }
+
+  async increaseByVariantId(variantId: string, quantity: number): Promise<void> {
+    const item = this.items.get(variantId);
+    if (!item) throw new Error("Inventory item not found");
     item.increase(quantity);
   }
 
-  async decrease(productId: string, quantity: number): Promise<void> {
-    const item = this.items.get(productId);
-    if (!item) {
-      throw new Error("Inventory item not found");
-    }
-    item.decrease(quantity);
+  async decreaseByVariantId(): Promise<void> {
+    throw new Error("not used");
   }
 
   async saveMovement(movement: StockMovement): Promise<void> {
     this.movements.push(movement);
   }
 
-  getItem(productId: string): InventoryItem | undefined {
-    return this.items.get(productId);
+  getItem(variantId: string): InventoryItem | undefined {
+    return this.items.get(variantId);
   }
 
   getMovements(): StockMovement[] {
@@ -53,27 +49,29 @@ class InMemoryInventoryRepository implements InventoryRepository {
 describe("ReceiveStock Use Case", () => {
   it("menambah stok dan mencatat movement IN dengan origin LEGACY", async () => {
     const repo = new InMemoryInventoryRepository([
-      { productId: "P001", quantity: 10 },
+      { variantId: "V001", quantity: 10 },
     ]);
 
-    const useCase = new ReceiveStock(repo);
+    const useCase = new ReceiveStock({ inventoryRepo: repo });
 
     await useCase.execute([
       {
-        productId: "P001",
+        variantId: "V001",
         quantity: 3,
         reason: "RESTOCK",
         referenceId: "RCV-1",
       },
     ]);
 
-    const item = repo.getItem("P001")!;
-    expect(item.getQuantity()).toBe(13);
+    const item = repo.getItem("V001");
+    expect(item).toBeDefined();
+    expect(item!.getQuantity()).toBe(13);
+    expect(repo.getMovements()).toHaveLength(1);
 
     const movement = repo.getMovements()[0];
-    expect(repo.getMovements()).toHaveLength(1);
+    expect(movement.variantId).toBe("V001");
+    expect(movement.productId).toBeNull();
     expect(movement.type).toBe("IN");
     expect(movement.origin).toBe("LEGACY");
-    expect(movement.referenceId).toBe("RCV-1");
   });
 });

@@ -1,31 +1,36 @@
 import { InventoryRepository } from "../domain/InventoryRepository";
 import { StockMovement } from "../domain/StockMovement";
+import { ReceiveStockRequest } from "./InventoryService";
 
-export type ReceiveStockRequest = {
-  productId: string;
-  quantity: number;
-  reason: string;
-  referenceId?: string;
+type Deps = {
+  inventoryRepo: InventoryRepository;
 };
 
 export class ReceiveStock {
-  constructor(
-    private readonly inventoryRepo: InventoryRepository
-  ) { }
+  constructor(private readonly deps: Deps) { }
 
   async execute(requests: ReceiveStockRequest[]): Promise<void> {
     for (const req of requests) {
-      await this.inventoryRepo.increase(req.productId, req.quantity);
+      const item = await this.deps.inventoryRepo.findByVariantId(req.variantId);
 
-      const movement = StockMovement.in(
-        req.productId,
+      if (!item) {
+        throw new Error(`Inventory item tidak ditemukan: ${req.variantId}`);
+      }
+
+      await this.deps.inventoryRepo.increaseByVariantId(
+        req.variantId,
         req.quantity,
-        req.reason,
-        'LEGACY',
-        req.referenceId
       );
 
-      await this.inventoryRepo.saveMovement(movement);
+      const movement = StockMovement.in({
+        variantId: req.variantId,
+        quantity: req.quantity,
+        reason: req.reason,
+        origin: "LEGACY",
+        referenceId: req.referenceId,
+      });
+
+      await this.deps.inventoryRepo.saveMovement(movement);
     }
   }
 }

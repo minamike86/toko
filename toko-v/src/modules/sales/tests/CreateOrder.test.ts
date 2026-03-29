@@ -1,24 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 import { CreateOrder } from "@/modules/sales/application/CreateOrder";
-import { OrderType } from "@/modules/sales/domain/OrderType";
 import { OrderRepository } from "@/modules/sales/domain/OrderRepository";
 import { Order } from "@/modules/sales/domain/Order";
-
+import { OrderType } from "@/modules/sales/domain/OrderType";
 import {
   CatalogReadRepository,
   CatalogProductSnapshot,
+  CatalogVariantReadModel,
 } from "@/modules/catalog/domain/CatalogReadRepository";
-
 import {
   InventoryService,
   IssueStockRequest,
 } from "@/modules/inventory/application/InventoryService";
-
 import { EntityId } from "@/shared/value-objects/EntityId";
-import { OptimisticLockConflictError } from "@/modules/sales/domain/SalesErrors";
-
-/* ===== Test Doubles ===== */
 
 class InMemoryOrderRepository implements OrderRepository {
   private readonly store = new Map<string, Order>();
@@ -27,26 +22,13 @@ class InMemoryOrderRepository implements OrderRepository {
     this.store.set(order.id.toString(), order);
   }
 
-  async findById(id: EntityId): Promise<Order | null> {
+  async findById(id: EntityId, _tx?: unknown): Promise<Order | null> {
     return this.store.get(id.toString()) ?? null;
   }
 
-  async saveWithVersionCheck(
-    order: Order,
-    expectedVersion: number,
-    _tx?: unknown
-  ): Promise<void> {
-    const existing = this.store.get(order.id.toString());
-    const currentVersion = existing?.getVersion();
-
-    if (currentVersion === undefined || currentVersion !== expectedVersion) {
-      throw new OptimisticLockConflictError();
-    }
-
-    order._incrementVersion();
-    this.store.set(order.id.toString(), order);
+  async saveWithVersionCheck(): Promise<void> {
+    throw new Error("not used in this test");
   }
-
 }
 
 class FakeCatalogReadRepository implements CatalogReadRepository {
@@ -55,108 +37,150 @@ class FakeCatalogReadRepository implements CatalogReadRepository {
       productId: "P001",
       name: "Produk Test",
       unit: "pcs",
-      price: 15000,
+      price: 10000,
       isActive: true,
     },
   ];
 
-  async getProductsByIds(
-    ids: string[]
-  ): Promise<CatalogProductSnapshot[]> {
+  private readonly variants: CatalogVariantReadModel[] = [
+    {
+      variantId: "V001",
+      productId: "P001",
+      productName: "Produk Test",
+      unit: "pcs",
+      price: 10000,
+      isActive: true,
+    },
+  ];
+
+  async getProductsByIds(ids: string[]): Promise<CatalogProductSnapshot[]> {
     return this.products.filter((p) => ids.includes(p.productId));
+  }
+
+  async getVariantsByIds(ids: string[]): Promise<CatalogVariantReadModel[]> {
+    return this.variants.filter((v) => ids.includes(v.variantId));
   }
 }
 
 class SpyInventoryService implements InventoryService {
-  issued: IssueStockRequest[] = [];
-  returned: IssueStockRequest[] = [];
+  public issued: IssueStockRequest[] = [];
+  public shouldFail = false;
 
   async issueStock(requests: IssueStockRequest[]): Promise<void> {
+    if (this.shouldFail) {
+      throw new Error("inventory gagal");
+    }
+
     this.issued.push(...requests);
   }
 
-  async returnStock(requests: IssueStockRequest[]): Promise<void> {
-    this.returned.push(...requests);
+  async returnStock(_requests: IssueStockRequest[]): Promise<void> {
+    // tidak dipakai di test ini
   }
 }
-
-class FailingInventoryService implements InventoryService {
-  async issueStock(): Promise<void> {
-    throw new Error("Insufficient stock");
-  }
-
-  async returnStock(): Promise<void> {
-    // sengaja kosong
-    // test ini tidak membutuhkan rollback stock
-  }
-}
-
-/* ===== Tests ===== */
 
 describe("CreateOrder Use Case", () => {
-  it("membuat order CASH dan langsung PAID", async () => {
-    const useCase = new CreateOrder({
-      orderRepo: new InMemoryOrderRepository(),
-      catalogReadRepo: new FakeCatalogReadRepository(),
-      inventoryService: new SpyInventoryService(),
-    });
+  let orderRepo: InMemoryOrderRepository;
+  let catalogReadRepo: FakeCatalogReadRepository;
+  let inventoryService: SpyInventoryService;
+  let useCase: CreateOrder;
 
+  beforeEach(() => {
+    orderRepo = new InMemoryOrderRepository();
+    catalogReadRepo = new FakeCatalogReadRepository();
+    inventoryService = new SpyInventoryService();
+
+    useCase = new CreateOrder({
+      orderRepo,
+      catalogReadRepo,
+      inventoryService,
+    });
+  });
+
+  it("membuat order CASH dan langsung PAID", async () => {
     const result = await useCase.execute({
-      orderId: "ORD-001",
+      orderId: "ORD-100",
       type: OrderType.OFFLINE,
       payment: "CASH",
       createdBy: "USER-1",
-      items: [{ productId: "P001", quantity: 2 }],
+      items: [{ variantId: "V001", quantity: 2 }],
     });
 
+    expect(result.orderId).toBe("ORD-100");
     expect(result.status).toBe("PAID");
-    expect(result.totalAmount).toBe(30000);
+    expect(result.totalAmount).toBe(20000);
     expect(result.outstandingAmount).toBe(0);
+
+    const savedOrder = await orderRepo.findById(EntityId.of("ORD-100"));
+    expect(savedOrder).not.toBeNull();
+    expect(savedOrder!.getStatus()).toBe("PAID");
+
+    expect(inventoryService.issued).toHaveLength(1);
+    expect(inventoryService.issued[0]).toEqual({
+      variantId: "V001",
+      quantity: 2,
+      reason: "SALE_ORDER",
+      referenceId: "ORD-100",
+    });
   });
 
   it("membuat order CREDIT dan berstatus ON_CREDIT", async () => {
-    const useCase = new CreateOrder({
-      orderRepo: new InMemoryOrderRepository(),
-      catalogReadRepo: new FakeCatalogReadRepository(),
-      inventoryService: new SpyInventoryService(),
-    });
-
     const result = await useCase.execute({
-      orderId: "ORD-002",
+      orderId: "ORD-101",
       type: OrderType.OFFLINE,
       payment: "CREDIT",
       createdBy: "USER-1",
-      items: [{ productId: "P001", quantity: 1 }],
+      items: [{ variantId: "V001", quantity: 2 }],
     });
 
+    expect(result.orderId).toBe("ORD-101");
     expect(result.status).toBe("ON_CREDIT");
-    expect(result.outstandingAmount).toBe(15000);
+    expect(result.totalAmount).toBe(20000);
+    expect(result.outstandingAmount).toBe(20000);
+
+    const savedOrder = await orderRepo.findById(EntityId.of("ORD-101"));
+    expect(savedOrder).not.toBeNull();
+    expect(savedOrder!.getStatus()).toBe("ON_CREDIT");
+
+    expect(inventoryService.issued).toHaveLength(1);
+    expect(inventoryService.issued[0]).toEqual({
+      variantId: "V001",
+      quantity: 2,
+      reason: "SALE_ORDER",
+      referenceId: "ORD-101",
+    });
   });
 
   it("menandai order sebagai FAILED jika inventory gagal", async () => {
-    const orderRepo = new InMemoryOrderRepository();
-
-    const useCase = new CreateOrder({
-      orderRepo,
-      catalogReadRepo: new FakeCatalogReadRepository(),
-      inventoryService: new FailingInventoryService(),
-    });
+    inventoryService.shouldFail = true;
 
     await expect(
       useCase.execute({
-        orderId: "ORD-003",
+        orderId: "ORD-102",
         type: OrderType.OFFLINE,
         payment: "CASH",
         createdBy: "USER-1",
-        items: [{ productId: "P001", quantity: 1 }],
+        items: [{ variantId: "V001", quantity: 2 }],
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow("inventory gagal");
 
-    const failedOrder = await orderRepo.findById(
-      EntityId.of("ORD-003")
-    );
-
+    const failedOrder = await orderRepo.findById(EntityId.of("ORD-102"));
     expect(failedOrder).not.toBeNull();
     expect(failedOrder!.getStatus()).toBe("FAILED");
+  });
+
+  it("melempar NotFoundError jika variant tidak ditemukan", async () => {
+    await expect(
+      useCase.execute({
+        orderId: "ORD-103",
+        type: OrderType.OFFLINE,
+        payment: "CASH",
+        createdBy: "USER-1",
+        items: [{ variantId: "VX99", quantity: 1 }],
+      })
+    ).rejects.toMatchObject({
+      name: "NotFoundError",
+      message: "ProductVariant not found: VX99",
+    });
   });
 });

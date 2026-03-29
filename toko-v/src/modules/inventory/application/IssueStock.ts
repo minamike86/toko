@@ -1,39 +1,36 @@
 import { InventoryRepository } from "../domain/InventoryRepository";
 import { StockMovement } from "../domain/StockMovement";
-import { InsufficientStockError } from "./InventoryService";
+import { InsufficientStockError, IssueStockRequest } from "./InventoryService";
 
-export type IssueStockRequest = {
-  productId: string;
-  quantity: number;
-  reason: string;
-  referenceId?: string;
+type Deps = {
+  inventoryRepo: InventoryRepository;
 };
 
 export class IssueStock {
-  constructor(
-    private readonly inventoryRepo: InventoryRepository
-  ) { }
+  constructor(private readonly deps: Deps) { }
 
   async execute(requests: IssueStockRequest[]): Promise<void> {
     for (const req of requests) {
-      const item = await this.inventoryRepo.find(req.productId);
+      const item = await this.deps.inventoryRepo.findByVariantId(req.variantId);
 
       if (!item || !item.canFulfill(req.quantity)) {
-        throw new InsufficientStockError(req.productId);
+        throw new InsufficientStockError(req.variantId);
       }
 
-
-      await this.inventoryRepo.decrease(req.productId, req.quantity);
-
-      const movement = StockMovement.out(
-        req.productId,
+      await this.deps.inventoryRepo.decreaseByVariantId(
+        req.variantId,
         req.quantity,
-        req.reason,
-        'LEGACY',
-        req.referenceId
       );
 
-      await this.inventoryRepo.saveMovement(movement);
+      const movement = StockMovement.out({
+        variantId: req.variantId,
+        quantity: req.quantity,
+        reason: req.reason,
+        origin: "LEGACY",
+        referenceId: req.referenceId,
+      });
+
+      await this.deps.inventoryRepo.saveMovement(movement);
     }
   }
 }

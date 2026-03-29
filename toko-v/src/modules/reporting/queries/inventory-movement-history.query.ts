@@ -1,11 +1,9 @@
-// inventory-movement-history-query.ts
-
 import { prisma } from "@/shared/prisma";
-import type { InventoryMovementHistoryDTO } from "@/modules/reporting/dto/inventory-movement-history.dto"
-
+import type { InventoryMovementHistoryDTO } from "@/modules/reporting/dto/inventory-movement-history.dto";
 
 type MovementWhere = {
   productId?: string;
+  variantId?: string;
   occurredAt?: {
     gte?: Date;
     lte?: Date;
@@ -14,6 +12,7 @@ type MovementWhere = {
 
 export async function findInventoryMovementHistory(filter?: {
   productId?: string;
+  variantId?: string;
   from?: Date;
   to?: Date;
 }): Promise<InventoryMovementHistoryDTO[]> {
@@ -21,6 +20,10 @@ export async function findInventoryMovementHistory(filter?: {
 
   if (filter?.productId) {
     where.productId = filter.productId;
+  }
+
+  if (filter?.variantId) {
+    where.variantId = filter.variantId;
   }
 
   if (filter?.from || filter?.to) {
@@ -41,6 +44,7 @@ export async function findInventoryMovementHistory(filter?: {
   return rows.map((row) => ({
     id: row.id,
     productId: row.productId,
+    variantId: row.variantId,
     movementDate: row.occurredAt,
     movementType: row.type,
     origin: row.origin,

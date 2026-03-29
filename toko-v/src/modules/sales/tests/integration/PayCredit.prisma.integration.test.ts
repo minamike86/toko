@@ -25,20 +25,27 @@ const actor = {
   role: "KASIR" as const,
 };
 
+const PRODUCT_ID = "P001";
+const VARIANT_ID = "V001";
+const PRODUCT_NAME = "Produk Test";
+const UNIT = "pcs";
+
 function makeOrderItem(params: {
   id: string;
-  productId: string;
-  name?: string;
-  unit?: string;
-  unitPrice: number;
+  productId?: string;
+  variantId?: string;
+  productNameSnapshot?: string;
+  unitSnapshot?: string;
+  unitPrice?: number;
   quantity?: number;
 }) {
   return OrderItem.create({
     id: EntityId.of(params.id),
-    productId: EntityId.of(params.productId),
-    productNameSnapshot: params.name ?? "Test Product",
-    unitSnapshot: params.unit ?? "pcs",
-    unitPriceSnapshot: Money.of(params.unitPrice),
+    productId: EntityId.of(params.productId ?? PRODUCT_ID),
+    variantId: EntityId.of(params.variantId ?? VARIANT_ID),
+    productNameSnapshot: params.productNameSnapshot ?? PRODUCT_NAME,
+    unitSnapshot: params.unitSnapshot ?? UNIT,
+    unitPriceSnapshot: Money.of(params.unitPrice ?? 10000),
     quantity: PositiveInt.of(params.quantity ?? 1),
   });
 }
@@ -50,7 +57,8 @@ function makeCreditOrder(params: {
 }) {
   const item = makeOrderItem({
     id: `${params.orderId}-ITEM-1`,
-    productId: `${params.orderId}-PRODUCT-1`,
+    productId: PRODUCT_ID,
+    variantId: VARIANT_ID,
     unitPrice: params.total,
     quantity: 1,
   });
@@ -68,6 +76,48 @@ function makeCreditOrder(params: {
   return order;
 }
 
+async function seedProductVariant() {
+  await prisma.product.upsert({
+    where: { id: PRODUCT_ID },
+    update: {
+      name: PRODUCT_NAME,
+      brand: null,
+      isActive: true,
+    },
+    create: {
+      id: PRODUCT_ID,
+      name: PRODUCT_NAME,
+      brand: null,
+      isActive: true,
+    },
+  });
+
+  await prisma.productVariant.upsert({
+    where: { id: VARIANT_ID },
+    update: {
+      productId: PRODUCT_ID,
+      sku: `SKU-${VARIANT_ID}`,
+      variantName: "Default",
+      unit: UNIT,
+      sizeLabel: null,
+      colorLabel: null,
+      basePrice: 10000,
+      isActive: true,
+    },
+    create: {
+      id: VARIANT_ID,
+      productId: PRODUCT_ID,
+      sku: `SKU-${VARIANT_ID}`,
+      variantName: "Default",
+      unit: UNIT,
+      sizeLabel: null,
+      colorLabel: null,
+      basePrice: 10000,
+      isActive: true,
+    },
+  });
+}
+
 describe.sequential("PayCredit Prisma Integration", () => {
   const orderRepository = new PrismaOrderRepository(prisma);
   const paymentRepository = new PrismaPaymentRepository(prisma);
@@ -75,13 +125,30 @@ describe.sequential("PayCredit Prisma Integration", () => {
   const payCredit = new PayCredit(
     orderRepository,
     paymentRepository,
-    transactionRunner,
+    transactionRunner
   );
 
   beforeEach(async () => {
+    // child tables dulu, baru parent tables
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+
+    await prisma.stockMovement.deleteMany({
+      where: { variantId: VARIANT_ID },
+    });
+    await prisma.inventoryItem.deleteMany({
+      where: { variantId: VARIANT_ID },
+    });
+
+    await prisma.productVariant.deleteMany({
+      where: { id: VARIANT_ID },
+    });
+    await prisma.product.deleteMany({
+      where: { id: PRODUCT_ID },
+    });
+
+    await seedProductVariant();
   });
 
   it("records partial payment and persists payment fields", async () => {
@@ -195,7 +262,7 @@ describe.sequential("PayCredit Prisma Integration", () => {
         paidAt: new Date("2026-01-04T10:00:00.000Z"),
         method: "TRANSFER",
         actor,
-      }),
+      })
     ).rejects.toBeInstanceOf(PaymentOverpayError);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));
@@ -253,7 +320,7 @@ describe.sequential("PayCredit Prisma Integration", () => {
     expect(
       rejectedReason instanceof PaymentOverpayError ||
       rejectedReason instanceof OptimisticLockConflictError ||
-      rejectedReason instanceof OrderNotOnCreditError,
+      rejectedReason instanceof OrderNotOnCreditError
     ).toBe(true);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));
@@ -315,7 +382,7 @@ describe.sequential("PayCredit Prisma Integration", () => {
     expect(
       rejectedReason instanceof PaymentOverpayError ||
       rejectedReason instanceof OptimisticLockConflictError ||
-      rejectedReason instanceof OrderNotOnCreditError,
+      rejectedReason instanceof OrderNotOnCreditError
     ).toBe(true);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));

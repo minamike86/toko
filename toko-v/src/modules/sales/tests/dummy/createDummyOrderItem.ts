@@ -3,13 +3,27 @@ import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
 
-export function createDummyOrderItem(orderId: string): OrderItem {
+type Params = {
+  orderId: string;
+  productId?: string;
+  variantId?: string;
+  productNameSnapshot?: string;
+  unitSnapshot?: string;
+  unitPrice?: number;
+  quantity?: number;
+};
+
+export function createDummyOrderItem(params: Params): OrderItem {
+  const productId = params.productId ?? "P001";
+  const variantId = params.variantId ?? "V001";
+
   return OrderItem.create({
-    id: EntityId.of(`${orderId}-item-1`),
-    productId: EntityId.of("P001"),
-    productNameSnapshot: "Produk Dummy",
-    unitSnapshot: "pcs",
-    unitPriceSnapshot: Money.of(10000),
-    quantity: PositiveInt.of(1),
+    id: EntityId.of(`${params.orderId}-item-1`),
+    productId: EntityId.of(productId),
+    variantId: EntityId.of(variantId),
+    productNameSnapshot: params.productNameSnapshot ?? "Produk Dummy",
+    unitSnapshot: params.unitSnapshot ?? "pcs",
+    unitPriceSnapshot: Money.of(params.unitPrice ?? 10000),
+    quantity: PositiveInt.of(params.quantity ?? 1),
   });
 }

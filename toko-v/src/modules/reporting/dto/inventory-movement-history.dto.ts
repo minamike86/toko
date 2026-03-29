@@ -1,6 +1,7 @@
 export type InventoryMovementHistoryDTO = {
   id: string;
   productId: string;
+  variantId: string | null;
   movementDate: Date;
   movementType: string;
   quantity: number;

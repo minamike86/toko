@@ -15,8 +15,8 @@ describe("Inventory Snapshot Report (integration)", () => {
   it("returns all inventory items including zero quantity", async () => {
     await seedInventoryReportingScenario(prisma, {
       inventoryItems: [
-        { productId: "P001", quantity: 10 },
-        { productId: "P002", quantity: 0 },
+        { productId: "P001", variantId: "V001", quantity: 10 },
+        { productId: "P002", variantId: "V002", quantity: 0 },
       ],
     });
 
@@ -25,10 +25,12 @@ describe("Inventory Snapshot Report (integration)", () => {
     expect(snapshot).toEqual([
       {
         productId: "P001",
+        variantId: "V001",
         currentStockQuantity: 10,
       },
       {
         productId: "P002",
+        variantId: "V002",
         currentStockQuantity: 0,
       },
     ]);
@@ -37,8 +39,8 @@ describe("Inventory Snapshot Report (integration)", () => {
   it("does not include products without inventoryItem record", async () => {
     await seedInventoryReportingScenario(prisma, {
       inventoryItems: [
-        { productId: "P001", quantity: 5 },
-        { productId: "P002", quantity: 0 },
+        { productId: "P001", variantId: "V001", quantity: 5 },
+        { productId: "P002", variantId: "V002", quantity: 0 },
       ],
     });
 
@@ -47,8 +49,8 @@ describe("Inventory Snapshot Report (integration)", () => {
     expect(snapshot).toHaveLength(2);
     expect(snapshot).toEqual(
       expect.arrayContaining([
-        { productId: "P001", currentStockQuantity: 5 },
-        { productId: "P002", currentStockQuantity: 0 },
+        { productId: "P001", variantId: "V001", currentStockQuantity: 5 },
+        { productId: "P002", variantId: "V002", currentStockQuantity: 0 },
       ])
     );
   });
@@ -59,9 +61,9 @@ describe("Inventory Snapshot Report (integration)", () => {
     expect(snapshot).toEqual([]);
   });
 
-  it("returns exactly one row per productId", async () => {
+  it("returns exactly one row per variantId", async () => {
     await seedInventoryReportingScenario(prisma, {
-      inventoryItems: [{ productId: "P001", quantity: 5 }],
+      inventoryItems: [{ productId: "P001", variantId: "V001", quantity: 5 }],
     });
 
     const snapshot = await getInventorySnapshotReport();
@@ -69,6 +71,7 @@ describe("Inventory Snapshot Report (integration)", () => {
     expect(snapshot).toHaveLength(1);
     expect(snapshot[0]).toEqual({
       productId: "P001",
+      variantId: "V001",
       currentStockQuantity: 5,
     });
   });

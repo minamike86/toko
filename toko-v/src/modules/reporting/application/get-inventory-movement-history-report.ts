@@ -3,6 +3,7 @@ import { findInventoryMovementHistory } from "@/modules/reporting/queries/invent
 
 export async function getInventoryMovementHistoryReport(filter?: {
   productId?: string;
+  variantId?: string;
   from?: Date;
   to?: Date;
 }): Promise<InventoryMovementHistoryDTO[]> {
