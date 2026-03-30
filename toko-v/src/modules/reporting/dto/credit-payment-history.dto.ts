@@ -1,12 +1,12 @@
-// src/modules/reporting/dto/credit-payment-history.dto.ts
-
 export type CreditPaymentHistoryDetailDTO = {
+  paymentId: string;
   orderId: string;
   paymentDate: Date;
   orderDate: Date;
   orderType: string;
   totalAmount: number;
   paidAmount: number;
+  method: string;
 };
 
 export type CreditPaymentHistorySummaryDTO = {

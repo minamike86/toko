@@ -1,5 +1,5 @@
+import type { InventorySnapshotReportRow } from "@/modules/reporting/dto/inventory-snapshot-report.dto";
 import { findInventorySnapshot } from "@/modules/reporting/queries/inventory-snapshot.query";
-import { InventorySnapshotReportRow } from "../dto/inventory-snapshot-report.dto";
 
 export async function getInventorySnapshotReport(): Promise<
   InventorySnapshotReportRow[]
@@ -7,8 +7,11 @@ export async function getInventorySnapshotReport(): Promise<
   const rows = await findInventorySnapshot();
 
   return rows.map((row) => ({
-    productId: row.productId,
     variantId: row.variantId,
+    productId: row.productId,
+    sku: row.sku,
+    productName: row.productName,
+    variantName: row.variantName,
     currentStockQuantity: row.quantity,
   }));
 }

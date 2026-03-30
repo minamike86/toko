@@ -1,5 +1,8 @@
 export type InventorySnapshotReportRow = {
-  variantId: string | null;
+  variantId: string;
   productId: string;
+  sku: string;
+  productName: string;
+  variantName: string;
   currentStockQuantity: number;
 };
