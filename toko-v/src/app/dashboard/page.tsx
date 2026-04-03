@@ -16,7 +16,7 @@ function getCurrentMonthPeriod(): { from: Date; to: Date } {
   };
 }
 
-export default async function Home() {
+export default async function DashboardPage() {
   const cashPeriod = getCurrentMonthPeriod();
 
   const [warehouseDashboard, cashClarityDashboard] = await Promise.all([
@@ -31,7 +31,7 @@ export default async function Home() {
           Owner Operational Dashboard
         </h1>
         <p className="text-sm text-slate-600">
-          Visibilitas operasional harian (stock, cash, outstanding).
+          Dashboard operasional harian berbasis reporting.
         </p>
       </header>
 

@@ -1,5 +1,9 @@
 import { EntityId } from "@/shared/value-objects/EntityId";
-import { NotFoundError } from "@/shared/errors/ApplicationError";
+import {
+  NotFoundError,
+} from "@/shared/errors/ApplicationError";
+import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 import { OrderRepository } from "../domain/OrderRepository";
 import { OrderStatus } from "../domain/OrderStatus";
@@ -11,15 +15,9 @@ import {
 import { AuditTrail } from "@/shared/audit/AuditTrail";
 import { Logger } from "@/shared/logging/Logger";
 
-/**
- * ======================
- * Types
- * ======================
- */
-
 export type CancelOrderInput = {
   orderId: string;
-  canceledBy: string; // metadata audit, disiapkan
+  actor: ActorContext;
 };
 
 export type CancelOrderResult = {
@@ -31,20 +29,16 @@ type Deps = {
   orderRepo: OrderRepository;
   inventoryService: InventoryService;
   auditTrail?: AuditTrail;
-  logger?: Logger; // OPTIONAL
+  logger?: Logger;
 };
-
-/**
- * ======================
- * Use Case
- * ======================
- */
-
 
 export class CancelOrder {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: CancelOrderInput): Promise<CancelOrderResult> {
+    AuthorizationGuard.assertActorExists(input.actor);
+    AuthorizationGuard.assertRole(input.actor, ["ADMIN"]);
+
     const useCaseName = "CancelOrder";
     const orderId = EntityId.of(input.orderId);
 
@@ -52,7 +46,7 @@ export class CancelOrder {
       useCase: useCaseName,
       entity: "Order",
       entityId: orderId.toString(),
-      actorId: input.canceledBy,
+      actorId: input.actor.actorId,
     });
 
     const order = await this.deps.orderRepo.findById(orderId);
@@ -80,11 +74,10 @@ export class CancelOrder {
           quantity: item.quantity.get(),
           reason: "CANCEL_ORDER",
           referenceId: order.id.toString(),
-        }))
+        })),
       );
     }
 
-    // Audit side effect
     try {
       await this.deps.auditTrail?.record({
         action: "ORDER_CANCELED",
@@ -92,7 +85,7 @@ export class CancelOrder {
         entityId: order.id.toString(),
         metadata: {
           previousStatus,
-          canceledBy: input.canceledBy,
+          actorId: input.actor.actorId,
         },
         occurredAt: new Date(),
       });
@@ -104,7 +97,7 @@ export class CancelOrder {
       useCase: useCaseName,
       entity: "Order",
       entityId: order.id.toString(),
-      actorId: input.canceledBy,
+      actorId: input.actor.actorId,
     });
 
     return {
@@ -113,15 +106,10 @@ export class CancelOrder {
     };
   }
 
-  /**
-   * ======================
-   * Logging helper (NON-BLOCKING)
-   * ======================
-   */
   private safeLog(
     level: "info" | "warn" | "error",
     message: string,
-    context: Record<string, string | undefined>
+    context: Record<string, string | undefined>,
   ) {
     try {
       this.deps.logger?.[level](message, context);

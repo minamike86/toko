@@ -22,9 +22,9 @@ import { Money } from "@/shared/value-objects/Money";
 import { FakeTransactionRunner } from "../tests/dummy/FakeTransactionRunner";
 
 const actor = {
-  id: "user-1",
-  role: "KASIR" as const,
-};
+  actorId: "user-1",
+  role: "SALES",
+} as const;
 
 describe("PayCredit", () => {
   let orderRepository: InMemoryOrderRepository;

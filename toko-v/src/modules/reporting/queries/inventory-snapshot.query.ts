@@ -6,6 +6,7 @@ export type InventorySnapshotRow = {
   sku: string;
   productName: string;
   variantName: string;
+  unit: string;
   quantity: number;
 };
 
@@ -20,6 +21,7 @@ export async function findInventorySnapshot(): Promise<InventorySnapshotRow[]> {
           productId: true,
           sku: true,
           variantName: true,
+          unit: true,
           product: {
             select: {
               name: true,
@@ -55,6 +57,12 @@ export async function findInventorySnapshot(): Promise<InventorySnapshotRow[]> {
       );
     }
 
+    if (!row.variant.unit) {
+      throw new Error(
+        `Inventory snapshot query found variant without unit: ${row.variantId}`,
+      );
+    }
+
     if (!row.variant.product.name) {
       throw new Error(
         `Inventory snapshot query found variant product without product name: ${row.variantId}`,
@@ -67,6 +75,7 @@ export async function findInventorySnapshot(): Promise<InventorySnapshotRow[]> {
       sku: row.variant.sku,
       productName: row.variant.product.name,
       variantName: row.variant.variantName,
+      unit: row.variant.unit,
       quantity: row.quantity,
     };
   });

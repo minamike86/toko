@@ -1,3 +1,6 @@
+import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
+import { ActorContext } from "@/shared/system/types/actor-context";
+
 import { InventoryRepository } from "../domain/InventoryRepository";
 import { StockMovement } from "../domain/StockMovement";
 import { ReceiveStockRequest } from "./InventoryService";
@@ -9,7 +12,13 @@ type Deps = {
 export class ReceiveStock {
   constructor(private readonly deps: Deps) { }
 
-  async execute(requests: ReceiveStockRequest[]): Promise<void> {
+  async execute(
+    requests: ReceiveStockRequest[],
+    actor: ActorContext,
+  ): Promise<void> {
+    AuthorizationGuard.assertActorExists(actor);
+    AuthorizationGuard.assertRole(actor, ["ADMIN", "WAREHOUSE"]);
+
     for (const req of requests) {
       const item = await this.deps.inventoryRepo.findByVariantId(req.variantId);
 

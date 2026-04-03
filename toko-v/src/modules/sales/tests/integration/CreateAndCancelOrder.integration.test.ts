@@ -16,6 +16,16 @@ describe("Integration: CreateOrder → Inventory → CancelOrder", () => {
     const ORDER_QTY = 2;
     const ORDER_ID = "ORDER-1";
 
+    const salesActor = {
+      actorId: "user-1",
+      role: "SALES" as const,
+    };
+
+    const adminActor = {
+      actorId: "admin-1",
+      role: "ADMIN" as const,
+    };
+
     await seedInventory(prisma, {
       productId: PRODUCT_ID,
       variantId: VARIANT_ID,
@@ -32,8 +42,8 @@ describe("Integration: CreateOrder → Inventory → CancelOrder", () => {
     await createOrder.execute({
       orderId: ORDER_ID,
       type: OrderType.OFFLINE,
-      createdBy: "user-1",
       payment: "CASH",
+      actor: salesActor,
       items: [
         {
           variantId: VARIANT_ID,
@@ -58,7 +68,7 @@ describe("Integration: CreateOrder → Inventory → CancelOrder", () => {
 
     await cancelOrder.execute({
       orderId: ORDER_ID,
-      canceledBy: "user-1",
+      actor: adminActor,
     });
 
     const orderAfterCancel = await prisma.order.findUnique({

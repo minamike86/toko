@@ -21,9 +21,9 @@ import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
 
 const actor = {
-  id: "user-1",
-  role: "KASIR" as const,
-};
+  actorId: "user-1",
+  role: "SALES",
+} as const;
 
 const PRODUCT_ID = "P001";
 const VARIANT_ID = "V001";

@@ -23,6 +23,7 @@ describe("getInventorySnapshotReport", () => {
         sku: "SKU-001",
         productName: "Produk A",
         variantName: "Merah",
+        unit: "PCS",
         quantity: 7,
       },
     ]);
@@ -34,6 +35,7 @@ describe("getInventorySnapshotReport", () => {
         sku: "SKU-001",
         productName: "Produk A",
         variantName: "Merah",
+        unit: "PCS",
         currentStockQuantity: 7,
       },
     ]);

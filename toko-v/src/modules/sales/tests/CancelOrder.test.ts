@@ -22,12 +22,12 @@ import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
 
-import { NotFoundError } from "@/shared/errors/ApplicationError";
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "@/shared/errors/ApplicationError";
 import { OptimisticLockConflictError } from "@/modules/sales/domain/SalesErrors";
-
-/* ======================================================
-   Test Doubles
-   ====================================================== */
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 class InMemoryOrderRepository implements OrderRepository {
   private readonly store = new Map<string, Order>();
@@ -43,7 +43,7 @@ class InMemoryOrderRepository implements OrderRepository {
   async saveWithVersionCheck(
     order: Order,
     expectedVersion: number,
-    _tx?: unknown
+    _tx?: unknown,
   ): Promise<void> {
     const existing = this.store.get(order.id.toString());
     const currentVersion = existing?.getVersion();
@@ -101,14 +101,25 @@ class SpyInventoryService implements InventoryService {
   }
 }
 
-/* ======================================================
-   Tests
-   ====================================================== */
-
 describe("CancelOrder Use Case", () => {
   let useCase: CancelOrder;
   let orderRepo: InMemoryOrderRepository;
   let inventoryService: SpyInventoryService;
+
+  const salesActor: ActorContext = {
+    actorId: "USER-1",
+    role: "SALES",
+  };
+
+  const adminActor: ActorContext = {
+    actorId: "ADMIN-1",
+    role: "ADMIN",
+  };
+
+  const warehouseActor: ActorContext = {
+    actorId: "WH-1",
+    role: "WAREHOUSE",
+  };
 
   beforeEach(() => {
     orderRepo = new InMemoryOrderRepository();
@@ -143,7 +154,7 @@ describe("CancelOrder Use Case", () => {
 
     const result = await useCase.execute({
       orderId: "ORD-300",
-      canceledBy: "USER-1",
+      actor: adminActor,
     });
 
     expect(result.status).toBe(OrderStatus.CANCELED);
@@ -162,7 +173,7 @@ describe("CancelOrder Use Case", () => {
       orderId: "ORD-301",
       type: OrderType.OFFLINE,
       payment: "CASH",
-      createdBy: "USER-1",
+      actor: salesActor,
       items: [{ variantId: "V001", quantity: 2 }],
     });
 
@@ -171,7 +182,7 @@ describe("CancelOrder Use Case", () => {
 
     const result = await useCase.execute({
       orderId: "ORD-301",
-      canceledBy: "USER-1",
+      actor: adminActor,
     });
 
     expect(result.status).toBe(OrderStatus.CANCELED);
@@ -187,7 +198,19 @@ describe("CancelOrder Use Case", () => {
 
   it("throws NotFoundError when order does not exist", async () => {
     await expect(
-      useCase.execute({ orderId: "missing-id", canceledBy: "user-1" })
+      useCase.execute({
+        orderId: "missing-id",
+        actor: adminActor,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("rejects unauthorized role", async () => {
+    await expect(
+      useCase.execute({
+        orderId: "ORD-999",
+        actor: warehouseActor,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

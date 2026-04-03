@@ -12,6 +12,7 @@ export async function getInventorySnapshotReport(): Promise<
     sku: row.sku,
     productName: row.productName,
     variantName: row.variantName,
+    unit: row.unit,
     currentStockQuantity: row.quantity,
   }));
 }

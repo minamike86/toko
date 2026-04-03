@@ -15,6 +15,7 @@ export async function getWarehouseDashboard(): Promise<WarehouseDashboardDTO> {
     sku: row.sku,
     productName: row.productName,
     variantName: row.variantName,
+    unit: row.unit,
     currentStockQuantity: row.currentStockQuantity,
     lowStockThreshold: LOW_STOCK_THRESHOLD,
     isLowStock: lowStockSet.has(row.variantId),

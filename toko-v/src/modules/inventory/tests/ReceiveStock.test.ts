@@ -4,6 +4,8 @@ import { ReceiveStock } from "@/modules/inventory/application/ReceiveStock";
 import { InventoryRepository } from "@/modules/inventory/domain/InventoryRepository";
 import { InventoryItem } from "@/modules/inventory/domain/InventoryItem";
 import { StockMovement } from "@/modules/inventory/domain/StockMovement";
+import { ForbiddenError } from "@/shared/errors/ApplicationError";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 class InMemoryInventoryRepository implements InventoryRepository {
   private readonly items = new Map<string, InventoryItem>();
@@ -47,6 +49,16 @@ class InMemoryInventoryRepository implements InventoryRepository {
 }
 
 describe("ReceiveStock Use Case", () => {
+  const warehouseActor: ActorContext = {
+    actorId: "WH-1",
+    role: "WAREHOUSE",
+  };
+
+  const salesActor: ActorContext = {
+    actorId: "SALES-1",
+    role: "SALES",
+  };
+
   it("menambah stok dan mencatat movement IN dengan origin LEGACY", async () => {
     const repo = new InMemoryInventoryRepository([
       { variantId: "V001", quantity: 10 },
@@ -54,14 +66,16 @@ describe("ReceiveStock Use Case", () => {
 
     const useCase = new ReceiveStock({ inventoryRepo: repo });
 
-    await useCase.execute([
+    const requests = [
       {
         variantId: "V001",
         quantity: 3,
         reason: "RESTOCK",
         referenceId: "RCV-1",
       },
-    ]);
+    ];
+
+    await useCase.execute(requests, warehouseActor);
 
     const item = repo.getItem("V001");
     expect(item).toBeDefined();
@@ -73,5 +87,49 @@ describe("ReceiveStock Use Case", () => {
     expect(movement.productId).toBeNull();
     expect(movement.type).toBe("IN");
     expect(movement.origin).toBe("LEGACY");
+  });
+
+  it("menolak actor yang tidak ada", async () => {
+    const repo = new InMemoryInventoryRepository([
+      { variantId: "V001", quantity: 10 },
+    ]);
+
+    const useCase = new ReceiveStock({ inventoryRepo: repo });
+
+    await expect(
+      useCase.execute(
+        [
+          {
+            variantId: "V001",
+            quantity: 3,
+            reason: "RESTOCK",
+            referenceId: "RCV-1",
+          },
+        ],
+        undefined as unknown as ActorContext,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("menolak role yang tidak berhak", async () => {
+    const repo = new InMemoryInventoryRepository([
+      { variantId: "V001", quantity: 10 },
+    ]);
+
+    const useCase = new ReceiveStock({ inventoryRepo: repo });
+
+    await expect(
+      useCase.execute(
+        [
+          {
+            variantId: "V001",
+            quantity: 3,
+            reason: "RESTOCK",
+            referenceId: "RCV-1",
+          },
+        ],
+        salesActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

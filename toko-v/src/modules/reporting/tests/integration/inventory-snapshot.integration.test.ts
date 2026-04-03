@@ -18,7 +18,7 @@ describe("Inventory Snapshot Report (integration)", () => {
 
   it("returns all inventory items including zero quantity", async () => {
     await seedInventoryReportingScenario(prisma, [
-      { productId: "P001", variantId: "V001", quantity: 10 },
+      { productId: "P001", variantId: "V001", quantity: 20 },
       { productId: "P002", variantId: "V002", quantity: 0 },
     ]);
 
@@ -31,7 +31,8 @@ describe("Inventory Snapshot Report (integration)", () => {
         sku: "V001",
         productName: "P001",
         variantName: "V001",
-        currentStockQuantity: 10,
+        unit: "PCS",
+        currentStockQuantity: 20,
       },
       {
         productId: "P002",
@@ -39,6 +40,7 @@ describe("Inventory Snapshot Report (integration)", () => {
         sku: "V002",
         productName: "P002",
         variantName: "V002",
+        unit: "PCS",
         currentStockQuantity: 0,
       },
     ]);
@@ -46,7 +48,7 @@ describe("Inventory Snapshot Report (integration)", () => {
 
   it("does not include products without inventoryItem record", async () => {
     await seedInventoryReportingScenario(prisma, [
-      { productId: "P001", variantId: "V001", quantity: 5 },
+      { productId: "P001", variantId: "V001", quantity: 10 },
       { productId: "P002", variantId: "V002", quantity: 0 },
     ]);
 
@@ -61,7 +63,8 @@ describe("Inventory Snapshot Report (integration)", () => {
           sku: "V001",
           productName: "P001",
           variantName: "V001",
-          currentStockQuantity: 5,
+          unit: "PCS",
+          currentStockQuantity: 10,
         },
         {
           productId: "P002",
@@ -69,6 +72,7 @@ describe("Inventory Snapshot Report (integration)", () => {
           sku: "V002",
           productName: "P002",
           variantName: "V002",
+          unit: "PCS",
           currentStockQuantity: 0,
         },
       ]),
@@ -83,7 +87,7 @@ describe("Inventory Snapshot Report (integration)", () => {
 
   it("returns exactly one row per variantId", async () => {
     await seedInventoryReportingScenario(prisma, [
-      { productId: "P001", variantId: "V001", quantity: 5 },
+      { productId: "P001", variantId: "V001", quantity: 20 },
     ]);
 
     const snapshot = await getInventorySnapshotReport();
@@ -95,7 +99,8 @@ describe("Inventory Snapshot Report (integration)", () => {
       sku: "V001",
       productName: "P001",
       variantName: "V001",
-      currentStockQuantity: 5,
+      unit: "PCS",
+      currentStockQuantity: 20,
     });
   });
 });

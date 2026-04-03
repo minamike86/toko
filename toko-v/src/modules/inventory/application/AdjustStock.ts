@@ -1,3 +1,6 @@
+import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
+import { ActorContext } from "@/shared/system/types/actor-context";
+
 import { InventoryRepository } from "../domain/InventoryRepository";
 import { StockMovement } from "../domain/StockMovement";
 
@@ -14,7 +17,10 @@ type Deps = {
 export class AdjustStock {
   constructor(private readonly deps: Deps) { }
 
-  async execute(input: AdjustStockInput): Promise<void> {
+  async execute(input: AdjustStockInput, actor: ActorContext): Promise<void> {
+    AuthorizationGuard.assertActorExists(actor);
+    AuthorizationGuard.assertRole(actor, ["ADMIN", "WAREHOUSE"]);
+
     if (input.newQuantity < 0) {
       throw new Error(`newQuantity tidak boleh negatif: ${input.newQuantity}`);
     }

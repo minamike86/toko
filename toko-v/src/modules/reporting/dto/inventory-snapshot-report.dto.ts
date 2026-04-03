@@ -4,5 +4,6 @@ export type InventorySnapshotReportRow = {
   sku: string;
   productName: string;
   variantName: string;
+  unit: string;
   currentStockQuantity: number;
 };

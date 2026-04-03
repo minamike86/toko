@@ -1,6 +1,8 @@
 import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
+import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 import { Order } from "../domain/Order";
 import { OrderItem } from "../domain/OrderItem";
@@ -24,20 +26,11 @@ export class NotFoundError extends Error {
   }
 }
 
-type CatalogVariantView = {
-  variantId: string;
-  productId: string;
-  productName: string;
-  unit: string;
-  price: number;
-  isActive: boolean;
-};
-
 export type CreateOrderInput = {
   orderId: string;
   type: OrderType;
   payment: "CASH" | "CREDIT";
-  createdBy: string;
+  actor: ActorContext;
   items: Array<{
     variantId: string;
     quantity: number;
@@ -61,8 +54,11 @@ export class CreateOrder {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: CreateOrderInput): Promise<CreateOrderResult> {
+    AuthorizationGuard.assertActorExists(input.actor);
+    AuthorizationGuard.assertRole(input.actor, ["ADMIN", "SALES"]);
+
     const variants = await this.deps.catalogReadRepo.getVariantsByIds(
-      input.items.map((i) => i.variantId)
+      input.items.map((i) => i.variantId),
     );
 
     const variantMap = new Map(variants.map((v) => [v.variantId, v]));
@@ -94,7 +90,7 @@ export class CreateOrder {
       type: input.type,
       items: orderItems,
       createdAt: new Date(),
-      createdBy: EntityId.of(input.createdBy),
+      createdBy: EntityId.of(input.actor.actorId),
     });
 
     await this.deps.orderRepo.save(order);

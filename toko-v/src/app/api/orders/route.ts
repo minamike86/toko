@@ -7,7 +7,6 @@ import {
   inventoryService,
 } from "@/wiring/container";
 
-
 type ErrorResponse = {
   error: string;
   message: string;
@@ -28,7 +27,10 @@ export async function POST(req: Request) {
       type: body.type as OrderType,
       payment: body.payment,
       items: body.items,
-      createdBy: body.createdBy,
+      actor: {
+        actorId: body.actorId,
+        role: body.role,
+      },
     });
 
     return NextResponse.json(result, { status: 201 });

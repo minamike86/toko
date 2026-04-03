@@ -16,11 +16,17 @@ it("AdjustStock uses inventoryRepo to adjust stock by variantId", async () => {
 
   const useCase = new AdjustStock({ inventoryRepo });
 
-  await useCase.execute({
-    variantId: "V001",
-    newQuantity: 110,
-    reason: "STOCK_OPNAME",
-  });
+  await useCase.execute(
+    {
+      variantId: "V001",
+      newQuantity: 110,
+      reason: "STOCK_OPNAME",
+    },
+    {
+      actorId: "ADMIN-1",
+      role: "ADMIN",
+    },
+  );
 
   expect(inventoryRepo.findByVariantId).toHaveBeenCalledWith("V001");
   expect(inventoryRepo.increaseByVariantId).toHaveBeenCalledWith("V001", 10);

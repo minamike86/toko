@@ -3,6 +3,7 @@ export type WarehouseDashboardItemDTO = {
   sku: string;
   productName: string;
   variantName: string;
+  unit: string;
   currentStockQuantity: number;
   lowStockThreshold: number;
   isLowStock: boolean;

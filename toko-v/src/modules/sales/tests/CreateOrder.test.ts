@@ -14,6 +14,8 @@ import {
   IssueStockRequest,
 } from "@/modules/inventory/application/InventoryService";
 import { EntityId } from "@/shared/value-objects/EntityId";
+import { ForbiddenError } from "@/shared/errors/ApplicationError";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 class InMemoryOrderRepository implements OrderRepository {
   private readonly store = new Map<string, Order>();
@@ -85,6 +87,21 @@ describe("CreateOrder Use Case", () => {
   let inventoryService: SpyInventoryService;
   let useCase: CreateOrder;
 
+  const salesActor: ActorContext = {
+    actorId: "USER-1",
+    role: "SALES",
+  };
+
+  const adminActor: ActorContext = {
+    actorId: "ADMIN-1",
+    role: "ADMIN",
+  };
+
+  const warehouseActor: ActorContext = {
+    actorId: "WH-1",
+    role: "WAREHOUSE",
+  };
+
   beforeEach(() => {
     orderRepo = new InMemoryOrderRepository();
     catalogReadRepo = new FakeCatalogReadRepository();
@@ -102,7 +119,7 @@ describe("CreateOrder Use Case", () => {
       orderId: "ORD-100",
       type: OrderType.OFFLINE,
       payment: "CASH",
-      createdBy: "USER-1",
+      actor: salesActor,
       items: [{ variantId: "V001", quantity: 2 }],
     });
 
@@ -129,7 +146,7 @@ describe("CreateOrder Use Case", () => {
       orderId: "ORD-101",
       type: OrderType.OFFLINE,
       payment: "CREDIT",
-      createdBy: "USER-1",
+      actor: adminActor,
       items: [{ variantId: "V001", quantity: 2 }],
     });
 
@@ -159,9 +176,9 @@ describe("CreateOrder Use Case", () => {
         orderId: "ORD-102",
         type: OrderType.OFFLINE,
         payment: "CASH",
-        createdBy: "USER-1",
+        actor: salesActor,
         items: [{ variantId: "V001", quantity: 2 }],
-      })
+      }),
     ).rejects.toThrow("inventory gagal");
 
     const failedOrder = await orderRepo.findById(EntityId.of("ORD-102"));
@@ -175,12 +192,36 @@ describe("CreateOrder Use Case", () => {
         orderId: "ORD-103",
         type: OrderType.OFFLINE,
         payment: "CASH",
-        createdBy: "USER-1",
+        actor: salesActor,
         items: [{ variantId: "VX99", quantity: 1 }],
-      })
+      }),
     ).rejects.toMatchObject({
       name: "NotFoundError",
       message: "ProductVariant not found: VX99",
     });
+  });
+
+  it("menolak actor yang tidak ada", async () => {
+    await expect(
+      useCase.execute({
+        orderId: "ORD-104",
+        type: OrderType.OFFLINE,
+        payment: "CASH",
+        actor: undefined as unknown as ActorContext,
+        items: [{ variantId: "V001", quantity: 1 }],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("menolak role yang tidak berhak", async () => {
+    await expect(
+      useCase.execute({
+        orderId: "ORD-105",
+        type: OrderType.OFFLINE,
+        payment: "CASH",
+        actor: warehouseActor,
+        items: [{ variantId: "V001", quantity: 1 }],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

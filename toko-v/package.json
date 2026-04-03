@@ -11,7 +11,6 @@
     "test:ui": "vitest --ui",
     "db:backup": "ts-node scripts/db/backup.ts",
     "db:restore": "ts-node scripts/db/restore.ts"
-
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
@@ -22,6 +21,9 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -29,6 +31,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^29.0.1",
     "prisma": "^6.2.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

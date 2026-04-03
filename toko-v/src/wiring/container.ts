@@ -52,12 +52,22 @@ const issueStock = new IssueStock({ inventoryRepo });
 const receiveStock = new ReceiveStock({ inventoryRepo });
 
 /* ======================
+   DEFAULT ACTOR FOR INTERNAL RETURN FLOW
+   ====================== */
+
+const defaultReturnActor = {
+   actorId: "SYSTEM-CANCEL-ORDER",
+   role: "ADMIN" as const,
+};
+
+/* ======================
    INVENTORY SERVICE (PORT ADAPTER)
    ====================== */
 
 export const inventoryService = new InventoryServiceAdapter(
    issueStock,
-   receiveStock
+   receiveStock,
+   defaultReturnActor,
 );
 
 /* ======================
@@ -98,7 +108,7 @@ export const catalogReadRepo = new InMemoryCatalogReadRepository(
          price: 20000,
          isActive: true,
       },
-   ]
+   ],
 );
 
 /* ======================

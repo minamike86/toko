@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
+
 import { AdjustStock } from "../application/AdjustStock";
 import { InventoryRepository } from "../domain/InventoryRepository";
 import { InventoryItem } from "../domain/InventoryItem";
 import { StockMovement } from "../domain/StockMovement";
+import { ForbiddenError } from "@/shared/errors/ApplicationError";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 class InMemoryInventoryRepository implements InventoryRepository {
   public movements: StockMovement[] = [];
@@ -36,15 +39,28 @@ class InMemoryInventoryRepository implements InventoryRepository {
 }
 
 describe("AdjustStock", () => {
+  const adminActor: ActorContext = {
+    actorId: "ADMIN-1",
+    role: "ADMIN",
+  };
+
+  const salesActor: ActorContext = {
+    actorId: "SALES-1",
+    role: "SALES",
+  };
+
   it("mencatat stock movement saat stok disesuaikan", async () => {
     const repo = new InMemoryInventoryRepository();
     const useCase = new AdjustStock({ inventoryRepo: repo });
 
-    await useCase.execute({
-      variantId: "v-1",
-      newQuantity: 5,
-      reason: "stock opname",
-    });
+    await useCase.execute(
+      {
+        variantId: "v-1",
+        newQuantity: 5,
+        reason: "stock opname",
+      },
+      adminActor,
+    );
 
     expect(repo.movements).toHaveLength(1);
 
@@ -55,5 +71,37 @@ describe("AdjustStock", () => {
     expect(movement.reason).toBe("stock opname");
     expect(movement.type).toBe("ADJUST");
     expect(movement.origin).toBe("MANUAL_ADJUSTMENT");
+  });
+
+  it("menolak actor yang tidak ada", async () => {
+    const repo = new InMemoryInventoryRepository();
+    const useCase = new AdjustStock({ inventoryRepo: repo });
+
+    await expect(
+      useCase.execute(
+        {
+          variantId: "v-1",
+          newQuantity: 5,
+          reason: "stock opname",
+        },
+        undefined as unknown as ActorContext,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("menolak role yang tidak berhak", async () => {
+    const repo = new InMemoryInventoryRepository();
+    const useCase = new AdjustStock({ inventoryRepo: repo });
+
+    await expect(
+      useCase.execute(
+        {
+          variantId: "v-1",
+          newQuantity: 5,
+          reason: "stock opname",
+        },
+        salesActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

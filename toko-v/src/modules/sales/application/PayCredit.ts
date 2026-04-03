@@ -14,8 +14,9 @@ import {
 import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { NotFoundError } from "@/shared/errors/ApplicationError";
+import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
-import { AuthorizationGuard, Actor } from "./guards/AuthorizationGuard";
 import { TransactionRunner } from "./ports/TransactionRunner";
 
 export class PayCredit {
@@ -30,11 +31,12 @@ export class PayCredit {
     amount: number;
     paidAt: Date;
     method: string;
-    actor: Actor;
+    actor: ActorContext;
   }): Promise<void> {
     const { orderId, amount, paidAt, method, actor } = input;
 
-    AuthorizationGuard.allowRoles(actor, ["ADMIN", "KASIR"]);
+    AuthorizationGuard.assertActorExists(actor);
+    AuthorizationGuard.assertRole(actor, ["ADMIN", "SALES"]);
 
     if (amount <= 0) {
       throw new InvalidPaymentAmountError();
