@@ -135,6 +135,69 @@ model Payment {
   @@index([paidAt])
 }
 
+/* ======================================================
+   SUPPLIERS DOMAIN
+   ====================================================== */
+
+model Supplier {
+  id         String   @id @db.VarChar(36)
+  storeName  String   @map("store_name") @db.VarChar(200)
+  salesName  String?  @map("sales_name") @db.VarChar(200)
+  phone      String?  @db.VarChar(50)
+  notes      String?  @db.Text
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @map("created_at")
+
+  purchaseOrders PurchaseOrder[]
+
+  @@index([isActive])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id          String    @id @db.VarChar(36)
+  supplierId  String    @map("supplier_id") @db.VarChar(36)
+  status      String    @db.VarChar(20)
+  createdAt   DateTime  @map("created_at")
+  createdBy   String    @map("created_by") @db.VarChar(36)
+  receivedAt  DateTime? @map("received_at")
+  receivedBy  String?   @map("received_by") @db.VarChar(36)
+  canceledAt  DateTime? @map("canceled_at")
+  canceledBy  String?   @map("canceled_by") @db.VarChar(36)
+
+  supplier    Supplier       @relation(fields: [supplierId], references: [id])
+  items       PurchaseItem[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("purchase_orders")
+}
+
+model PurchaseItem {
+  id                   String   @id @db.VarChar(36)
+  purchaseOrderId      String   @map("purchase_order_id") @db.VarChar(36)
+  productId            String   @map("product_id") @db.VarChar(36)
+  variantId            String   @map("variant_id") @db.VarChar(36)
+  productNameSnapshot  String   @map("product_name_snapshot") @db.VarChar(200)
+  variantNameSnapshot  String   @map("variant_name_snapshot") @db.VarChar(200)
+  unitSnapshot         String   @map("unit_snapshot") @db.VarChar(50)
+  quantity             Int
+  unitCost             Int      @map("unit_cost")
+  subtotalCost         Int      @map("subtotal_cost")
+
+  purchaseOrder        PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@index([variantId])
+  @@map("purchase_items")
+}
+
+
+/* ======================================================
+   SETTING DOMAIN
+   ====================================================== */
+
 model SystemSetting {
   key        String   @id
   value      String

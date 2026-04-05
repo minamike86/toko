@@ -1,3 +1,9 @@
 // src/modules/user/domain/UserRole.ts
 
-export type UserRole = "ADMIN" | "SALES" | "WAREHOUSE";
+export const UserRole = {
+  ADMIN: "ADMIN",
+  SALES: "SALES",
+  WAREHOUSE: "WAREHOUSE",
+} as const;
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
