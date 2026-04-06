@@ -45,6 +45,14 @@ describe("procurement boundary", () => {
     }
   });
 
+  it("does not import inventory repository directly", () => {
+    for (const file of files) {
+      const content = fs.readFileSync(file, "utf8");
+
+      expect(content).not.toMatch(/InventoryRepository/);
+    }
+  });
+
   it("does not import sales mutation use cases", () => {
     for (const file of files) {
       const content = fs.readFileSync(file, "utf8");
@@ -53,19 +61,27 @@ describe("procurement boundary", () => {
     }
   });
 
-  it("does not depend on inventory port in batch 1", () => {
-    for (const file of files) {
-      const content = fs.readFileSync(file, "utf8");
+  it("depends on InventoryProcurementPort for receive flow", () => {
+    const content = fs.readFileSync(
+      path.join(
+        procurementRoot,
+        "application/use-cases/ReceivePurchaseOrder.ts",
+      ),
+      "utf8",
+    );
 
-      expect(content).not.toMatch(/InventoryProcurementPort/);
-    }
+    expect(content).toMatch(/InventoryProcurementPort/);
   });
 
-  it("does not define receive purchase order use case in batch 1", () => {
-    for (const file of files) {
-      const content = fs.readFileSync(file, "utf8");
+  it("defines receive purchase order use case", () => {
+    const content = fs.readFileSync(
+      path.join(
+        procurementRoot,
+        "application/use-cases/ReceivePurchaseOrder.ts",
+      ),
+      "utf8",
+    );
 
-      expect(content).not.toMatch(/class\s+ReceivePurchaseOrder/);
-    }
+    expect(content).toMatch(/class\s+ReceivePurchaseOrder/);
   });
 });
