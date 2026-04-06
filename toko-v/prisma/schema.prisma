@@ -171,6 +171,7 @@ model PurchaseOrder {
   @@index([supplierId])
   @@index([status])
   @@index([createdAt])
+  @@index([canceledAt])
   @@map("purchase_orders")
 }
 
