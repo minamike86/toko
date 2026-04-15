@@ -17,8 +17,7 @@ export class CreateSupplier {
     input: CreateSupplierInput,
     actor: ActorContext,
   ): Promise<SupplierDto> {
-    AuthorizationGuard.assertActorExists(actor);
-    AuthorizationGuard.assertRole(actor, [PROCUREMENT_ALLOWED_ROLES.ADMIN]);
+    AuthorizationGuard.assertAuthorized(actor, [PROCUREMENT_ALLOWED_ROLES.ADMIN]);
 
     const existingSupplier = await this.supplierRepository.findByStoreName(
       input.storeName,

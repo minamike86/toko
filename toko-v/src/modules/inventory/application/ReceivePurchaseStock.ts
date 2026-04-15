@@ -22,8 +22,7 @@ export class ReceivePurchaseStock {
 
   async execute(requests: ReceivePurchaseStockInput[]): Promise<void> {
     for (const request of requests) {
-      AuthorizationGuard.assertActorExists(request.actor);
-      AuthorizationGuard.assertRole(request.actor, ["ADMIN", "WAREHOUSE"]);
+      AuthorizationGuard.assertAuthorized(request.actor, ["ADMIN", "WAREHOUSE"]);
 
       const inventoryItem = await this.deps.inventoryRepo.findByVariantId(
         request.variantId,

@@ -16,8 +16,7 @@ export class ReceiveStock {
     requests: ReceiveStockRequest[],
     actor: ActorContext,
   ): Promise<void> {
-    AuthorizationGuard.assertActorExists(actor);
-    AuthorizationGuard.assertRole(actor, ["ADMIN", "WAREHOUSE"]);
+    AuthorizationGuard.assertAuthorized(actor, ["ADMIN", "WAREHOUSE"]);
 
     for (const req of requests) {
       const item = await this.deps.inventoryRepo.findByVariantId(req.variantId);

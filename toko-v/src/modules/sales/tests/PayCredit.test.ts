@@ -13,17 +13,16 @@ import { InMemoryOrderRepository } from "@/modules/sales/infrastructure/InMemory
 import { InMemoryPaymentRepository } from "@/modules/sales/infrastructure/InMemoryPaymentRepository";
 import { NotFoundError } from "@/shared/errors/ApplicationError";
 import { EntityId } from "@/shared/value-objects/EntityId";
+import { Money } from "@/shared/value-objects/Money";
+import { UserRole } from "@/modules/user/domain/UserRole";
 
 import { createDummyOrderItem } from "./dummy/createDummyOrderItem";
 import { createOrderWithTotal } from "./dummy/createOrderWithTotal";
-
-import { Money } from "@/shared/value-objects/Money";
-
 import { FakeTransactionRunner } from "../tests/dummy/FakeTransactionRunner";
 
 const actor = {
   actorId: "user-1",
-  role: "SALES",
+  role: UserRole.SALES,
 } as const;
 
 describe("PayCredit", () => {
@@ -39,7 +38,7 @@ describe("PayCredit", () => {
     payCredit = new PayCredit(
       orderRepository,
       paymentRepository,
-      fakeTransactionRunner
+      fakeTransactionRunner,
     );
   });
 
@@ -51,7 +50,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -74,7 +73,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(InvalidPaymentAmountError);
   });
 
@@ -98,7 +97,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(OrderNotOnCreditError);
   });
 
@@ -123,7 +122,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "TRANSFER",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(OrderNotOnCreditError);
   });
 
@@ -148,7 +147,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(OrderNotOnCreditError);
   });
 
@@ -231,7 +230,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "CASH",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(PaymentOverpayError);
   });
 
@@ -262,7 +261,7 @@ describe("PayCredit", () => {
         paidAt: new Date(),
         method: "TRANSFER",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(PaymentOverpayError);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));

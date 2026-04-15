@@ -40,4 +40,31 @@ describe("getInventorySnapshotReport", () => {
       },
     ]);
   });
+
+  it("preserves unit from query output", async () => {
+    findInventorySnapshotMock.mockResolvedValue([
+      {
+        variantId: "V002",
+        productId: "P002",
+        sku: "SKU-002",
+        productName: "Produk B",
+        variantName: "Biru",
+        unit: "BOX",
+        quantity: 12,
+      },
+    ]);
+
+    await expect(getInventorySnapshotReport()).resolves.toEqual([
+      {
+        variantId: "V002",
+        productId: "P002",
+        sku: "SKU-002",
+        productName: "Produk B",
+        variantName: "Biru",
+        unit: "BOX",
+        currentStockQuantity: 12,
+      },
+    ]);
+  });
+
 });

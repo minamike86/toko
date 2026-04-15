@@ -29,8 +29,7 @@ export class CreatePurchaseOrder {
     input: CreatePurchaseOrderInput,
     actor: ActorContext,
   ): Promise<PurchaseOrderDto> {
-    AuthorizationGuard.assertActorExists(actor);
-    AuthorizationGuard.assertRole(actor, [
+    const authorizedActor = AuthorizationGuard.assertAuthorized(actor, [
       PROCUREMENT_ALLOWED_ROLES.ADMIN,
       PROCUREMENT_ALLOWED_ROLES.WAREHOUSE,
     ]);
@@ -100,7 +99,7 @@ export class CreatePurchaseOrder {
       supplierId: supplier.id,
       items: purchaseItems,
       createdAt: new Date(),
-      createdBy: actor.actorId,
+      createdBy: authorizedActor.actorId,
     });
 
     await this.purchaseOrderRepository.save(order);

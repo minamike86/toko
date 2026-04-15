@@ -49,6 +49,7 @@ class FakeCatalogReadRepository implements CatalogReadRepository {
       variantId: "V001",
       productId: "P001",
       productName: "Produk Test",
+      variantName: "Default",
       unit: "pcs",
       price: 10000,
       isActive: true,
@@ -61,6 +62,10 @@ class FakeCatalogReadRepository implements CatalogReadRepository {
 
   async getVariantsByIds(ids: string[]): Promise<CatalogVariantReadModel[]> {
     return this.variants.filter((v) => ids.includes(v.variantId));
+  }
+
+  async listPosVariants(): Promise<CatalogVariantReadModel[]> {
+    return this.variants.filter((v) => v.isActive);
   }
 }
 

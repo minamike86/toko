@@ -1,10 +1,14 @@
 import { randomUUID } from "crypto";
+import { PrismaClient } from "@prisma/client";
+
 import { PurchaseOrder } from "@/modules/procurement/domain/PurchaseOrder";
 import { PurchaseOrderRepository } from "@/modules/procurement/domain/PurchaseOrderRepository";
 import { PrismaPurchaseOrderMapper } from "./mappers/PrismaPurchaseOrderMapper";
-import { prisma } from "@/shared/prisma";
+import { prisma as sharedPrisma } from "@/shared/prisma";
 
 export class PrismaPurchaseOrderRepository implements PurchaseOrderRepository {
+  constructor(private readonly prisma: PrismaClient = sharedPrisma) { }
+
   nextId(): string {
     return randomUUID();
   }
@@ -16,7 +20,7 @@ export class PrismaPurchaseOrderRepository implements PurchaseOrderRepository {
   async save(order: PurchaseOrder): Promise<void> {
     const data = PrismaPurchaseOrderMapper.toPersistence(order);
 
-    await prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       await tx.purchaseOrder.upsert({
         where: { id: data.id },
         create: {
@@ -66,7 +70,7 @@ export class PrismaPurchaseOrderRepository implements PurchaseOrderRepository {
   }
 
   async findById(id: string): Promise<PurchaseOrder | null> {
-    const record = await prisma.purchaseOrder.findUnique({
+    const record = await this.prisma.purchaseOrder.findUnique({
       where: { id },
       include: {
         items: {

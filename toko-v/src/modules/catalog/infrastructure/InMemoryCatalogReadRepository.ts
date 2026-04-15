@@ -25,4 +25,18 @@ export class InMemoryCatalogReadRepository implements CatalogReadRepository {
       (v) => variantIds.includes(v.variantId) && v.isActive,
     );
   }
+
+  async listPosVariants(): Promise<CatalogVariantReadModel[]> {
+    return this.variants
+      .filter((variant) => variant.isActive)
+      .sort((a, b) => {
+        const byProduct = a.productName.localeCompare(b.productName);
+        if (byProduct !== 0) {
+          return byProduct;
+        }
+
+        return a.variantName.localeCompare(b.variantName);
+      });
+  }
+
 }

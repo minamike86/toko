@@ -39,9 +39,7 @@ describe("procurement boundary", () => {
     for (const file of files) {
       const content = fs.readFileSync(file, "utf8");
 
-      expect(content).not.toMatch(
-        /@\/modules\/inventory\/infrastructure\//,
-      );
+      expect(content).not.toMatch(/@\/modules\/inventory\/infrastructure\//);
     }
   });
 
@@ -63,10 +61,7 @@ describe("procurement boundary", () => {
 
   it("depends on InventoryProcurementPort for receive flow", () => {
     const content = fs.readFileSync(
-      path.join(
-        procurementRoot,
-        "application/use-cases/ReceivePurchaseOrder.ts",
-      ),
+      path.join(procurementRoot, "application/use-cases/ReceivePurchaseOrder.ts"),
       "utf8",
     );
 
@@ -75,13 +70,28 @@ describe("procurement boundary", () => {
 
   it("defines receive purchase order use case", () => {
     const content = fs.readFileSync(
-      path.join(
-        procurementRoot,
-        "application/use-cases/ReceivePurchaseOrder.ts",
-      ),
+      path.join(procurementRoot, "application/use-cases/ReceivePurchaseOrder.ts"),
       "utf8",
     );
 
     expect(content).toMatch(/class\s+ReceivePurchaseOrder/);
+  });
+
+  it("cancel flow does not import InventoryProcurementPort", () => {
+    const content = fs.readFileSync(
+      path.join(procurementRoot, "application/use-cases/CancelPurchaseOrder.ts"),
+      "utf8",
+    );
+
+    expect(content).not.toMatch(/InventoryProcurementPort/);
+  });
+
+  it("defines cancel purchase order use case", () => {
+    const content = fs.readFileSync(
+      path.join(procurementRoot, "application/use-cases/CancelPurchaseOrder.ts"),
+      "utf8",
+    );
+
+    expect(content).toMatch(/class\s+CancelPurchaseOrder/);
   });
 });

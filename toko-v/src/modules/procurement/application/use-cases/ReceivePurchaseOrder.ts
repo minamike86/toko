@@ -6,11 +6,9 @@ import { InventoryProcurementPort } from "../ports/InventoryProcurementPort";
 import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
 import { ActorContext } from "@/shared/system/types/actor-context";
 import { NotFoundError } from "@/shared/errors/ApplicationError";
+import { UserRole } from "@/modules/user/domain/UserRole";
 
-const PROCUREMENT_ALLOWED_ROLES = {
-  ADMIN: "ADMIN",
-  WAREHOUSE: "WAREHOUSE",
-} as const;
+
 
 function toDto(order: PurchaseOrder): PurchaseOrderDto {
   return {
@@ -48,12 +46,11 @@ export class ReceivePurchaseOrder {
 
   async execute(
     input: ReceivePurchaseOrderInput,
-    actor: ActorContext,
+    actorParam: ActorContext,
   ): Promise<PurchaseOrderDto> {
-    AuthorizationGuard.assertActorExists(actor);
-    AuthorizationGuard.assertRole(actor, [
-      PROCUREMENT_ALLOWED_ROLES.ADMIN,
-      PROCUREMENT_ALLOWED_ROLES.WAREHOUSE,
+    const actor = AuthorizationGuard.assertAuthorized(actorParam, [
+      UserRole.ADMIN,
+      UserRole.WAREHOUSE,
     ]);
 
     const order = await this.purchaseOrderRepository.findById(

@@ -26,6 +26,44 @@ describe("Integration: CreateOrder → Inventory → CancelOrder", () => {
       role: "ADMIN" as const,
     };
 
+    // Seed catalog source of truth untuk CreateOrder
+    await prisma.product.upsert({
+      where: { id: PRODUCT_ID },
+      update: {
+        name: "Produk Test",
+        isActive: true,
+      },
+      create: {
+        id: PRODUCT_ID,
+        name: "Produk Test",
+        brand: null,
+        isActive: true,
+      },
+    });
+
+    await prisma.productVariant.upsert({
+      where: { id: VARIANT_ID },
+      update: {
+        productId: PRODUCT_ID,
+        sku: "SKU-V001",
+        variantName: "Default",
+        unit: "pcs",
+        basePrice: 10000,
+        isActive: true,
+      },
+      create: {
+        id: VARIANT_ID,
+        productId: PRODUCT_ID,
+        sku: "SKU-V001",
+        variantName: "Default",
+        unit: "pcs",
+        sizeLabel: null,
+        colorLabel: null,
+        basePrice: 10000,
+        isActive: true,
+      },
+    });
+
     await seedInventory(prisma, {
       productId: PRODUCT_ID,
       variantId: VARIANT_ID,

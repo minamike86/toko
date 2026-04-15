@@ -18,8 +18,7 @@ export class AdjustStock {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: AdjustStockInput, actor: ActorContext): Promise<void> {
-    AuthorizationGuard.assertActorExists(actor);
-    AuthorizationGuard.assertRole(actor, ["ADMIN", "WAREHOUSE"]);
+    AuthorizationGuard.assertAuthorized(actor, ["ADMIN", "WAREHOUSE"]);
 
     if (input.newQuantity < 0) {
       throw new Error(`newQuantity tidak boleh negatif: ${input.newQuantity}`);

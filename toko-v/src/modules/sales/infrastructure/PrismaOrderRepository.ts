@@ -15,10 +15,12 @@ type OrderWithItemsRow = Prisma.OrderGetPayload<{
   include: { items: true };
 }>;
 
+type PrismaDbClient = PrismaClient | Prisma.TransactionClient;
+
 export class PrismaOrderRepository implements OrderRepository {
   constructor(private readonly prisma: PrismaClient) { }
 
-  private getClient(tx?: unknown): PrismaClient | Prisma.TransactionClient {
+  private getClient(tx?: unknown): PrismaDbClient {
     return (tx as Prisma.TransactionClient | undefined) ?? this.prisma;
   }
 
@@ -96,13 +98,25 @@ export class PrismaOrderRepository implements OrderRepository {
       }
 
       order._incrementVersion();
-    } catch (error) {
-      if (this.isRetryableWriteConflict(error)) {
-        throw new OptimisticLockConflictError();
-      }
-
-      throw error;
+    } catch (error: unknown) {
+      throw this.mapPersistenceError(error);
     }
+  }
+
+  private mapPersistenceError(error: unknown): Error {
+    if (error instanceof OptimisticLockConflictError) {
+      return error;
+    }
+
+    if (this.isRetryableWriteConflict(error)) {
+      return new OptimisticLockConflictError();
+    }
+
+    if (error instanceof Error) {
+      return error;
+    }
+
+    return new Error("Unknown persistence error");
   }
 
   private isRetryableWriteConflict(error: unknown): boolean {

@@ -1,34 +1,27 @@
 // src/app/api/admin/maintenance/route.ts
 
-import { NextRequest, NextResponse } from "next/server"
-import { PrismaSystemStateRepository } from "@/shared/system/PrismaSystemStateRepository"
-import { ToggleMaintenance } from "@/shared/system/application/ToggleMaintenance"
-import { prisma } from "@/shared/prisma"
-
-const repo = new PrismaSystemStateRepository(prisma)
+import { NextRequest, NextResponse } from "next/server";
+import { systemStateRepo, toggleMaintenance } from "@/wiring/container";
 
 export async function GET() {
-  const info = await repo.getMaintenanceInfo()
+  const info = await systemStateRepo.getMaintenanceInfo();
 
-  return NextResponse.json(info)
+  return NextResponse.json(info);
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
+  const body = await req.json();
 
-  // TODO: ambil actor dari auth middleware kamu
   const actor = {
     id: "admin-id",
-    role: "ADMIN"
-  }
+    role: "ADMIN" as const,
+  };
 
-  const useCase = new ToggleMaintenance(repo)
-
-  await useCase.execute({
+  await toggleMaintenance.execute({
     enabled: body.enabled,
     actorId: actor.id,
-    actorRole: actor.role
-  })
+    actorRole: actor.role,
+  });
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true });
 }

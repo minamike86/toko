@@ -1,16 +1,12 @@
 import { EntityId } from "@/shared/value-objects/EntityId";
-import {
-  NotFoundError,
-} from "@/shared/errors/ApplicationError";
+import { NotFoundError } from "@/shared/errors/ApplicationError";
 import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
 import { ActorContext } from "@/shared/system/types/actor-context";
 
 import { OrderRepository } from "../domain/OrderRepository";
 import { OrderStatus } from "../domain/OrderStatus";
 
-import {
-  InventoryService,
-} from "@/modules/inventory/application/InventoryService";
+import { InventoryService } from "@/modules/inventory/application/InventoryService";
 
 import { AuditTrail } from "@/shared/audit/AuditTrail";
 import { Logger } from "@/shared/logging/Logger";
@@ -36,8 +32,7 @@ export class CancelOrder {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: CancelOrderInput): Promise<CancelOrderResult> {
-    AuthorizationGuard.assertActorExists(input.actor);
-    AuthorizationGuard.assertRole(input.actor, ["ADMIN"]);
+    const actor = AuthorizationGuard.assertAuthorized(input.actor, ["ADMIN"]);
 
     const useCaseName = "CancelOrder";
     const orderId = EntityId.of(input.orderId);
@@ -46,7 +41,7 @@ export class CancelOrder {
       useCase: useCaseName,
       entity: "Order",
       entityId: orderId.toString(),
-      actorId: input.actor.actorId,
+      actorId: actor.actorId,
     });
 
     const order = await this.deps.orderRepo.findById(orderId);
@@ -85,7 +80,7 @@ export class CancelOrder {
         entityId: order.id.toString(),
         metadata: {
           previousStatus,
-          actorId: input.actor.actorId,
+          actorId: actor.actorId,
         },
         occurredAt: new Date(),
       });
@@ -97,7 +92,7 @@ export class CancelOrder {
       useCase: useCaseName,
       entity: "Order",
       entityId: order.id.toString(),
-      actorId: input.actor.actorId,
+      actorId: actor.actorId,
     });
 
     return {

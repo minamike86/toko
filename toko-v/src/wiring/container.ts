@@ -1,13 +1,22 @@
 import { PrismaClient } from "@prisma/client";
 
 /* ======================
+   SYSTEM / MAINTENANCE
+   ====================== */
+
+import { PrismaSystemStateRepository } from "@/shared/system/PrismaSystemStateRepository";
+import { ToggleMaintenance } from "@/shared/system/application/ToggleMaintenance";
+
+/* ======================
    SALES
    ====================== */
 
 import { CreateOrder } from "@/modules/sales/application/CreateOrder";
 import { CancelOrder } from "@/modules/sales/application/CancelOrder";
-
+import { PayCredit } from "@/modules/sales/application/PayCredit";
 import { PrismaOrderRepository } from "@/modules/sales/infrastructure/PrismaOrderRepository";
+import { PrismaPaymentRepository } from "@/modules/sales/infrastructure/PrismaPaymentRepository";
+import { PrismaTransactionRunner } from "@/modules/sales/infrastructure/PrismaTransactionRunner";
 
 /* ======================
    INVENTORY
@@ -15,15 +24,22 @@ import { PrismaOrderRepository } from "@/modules/sales/infrastructure/PrismaOrde
 
 import { IssueStock } from "@/modules/inventory/application/IssueStock";
 import { ReceiveStock } from "@/modules/inventory/application/ReceiveStock";
-
 import { PrismaInventoryRepository } from "@/modules/inventory/infrastructure/PrismaInventoryRepository";
 import { InventoryServiceAdapter } from "@/modules/inventory/infrastructure/InventoryServiceAdapter";
+
+/* ======================
+   PROCUREMENT
+   ====================== */
+
+import { CancelPurchaseOrder } from "@/modules/procurement/application/use-cases/CancelPurchaseOrder";
+import { PrismaPurchaseOrderRepository } from "@/modules/procurement/infrastructure/prisma/PrismaPurchaseOrderRepository";
 
 /* ======================
    CATALOG (READ ONLY)
    ====================== */
 
-import { InMemoryCatalogReadRepository } from "@/modules/catalog/infrastructure/InMemoryCatalogReadRepository";
+import { ListPosVariants } from "@/modules/catalog/application/ListPosVariants";
+import { PrismaCatalogReadRepository } from "@/modules/catalog/infrastructure/PrismaCatalogReadRepository";
 
 /* ======================
    PRISMA CLIENT
@@ -37,9 +53,20 @@ const prisma = new PrismaClient();
 
 // Sales
 export const orderRepo = new PrismaOrderRepository(prisma);
+export const paymentRepo = new PrismaPaymentRepository(prisma);
+export const transactionRunner = new PrismaTransactionRunner(prisma);
 
 // Inventory
 export const inventoryRepo = new PrismaInventoryRepository(prisma);
+
+// Procurement
+export const purchaseOrderRepo = new PrismaPurchaseOrderRepository(prisma);
+
+// Catalog
+export const catalogReadRepo = new PrismaCatalogReadRepository();
+
+// System
+export const systemStateRepo = new PrismaSystemStateRepository(prisma);
 
 /* ======================
    INVENTORY USE CASES
@@ -71,45 +98,12 @@ export const inventoryService = new InventoryServiceAdapter(
 );
 
 /* ======================
-   CATALOG REPO (TEMP / MVP)
+   CATALOG USE CASES
    ====================== */
 
-export const catalogReadRepo = new InMemoryCatalogReadRepository(
-   [
-      {
-         productId: "P001",
-         name: "Produk A",
-         unit: "pcs",
-         price: 10000,
-         isActive: true,
-      },
-      {
-         productId: "P002",
-         name: "Produk B",
-         unit: "pcs",
-         price: 20000,
-         isActive: true,
-      },
-   ],
-   [
-      {
-         variantId: "V001",
-         productId: "P001",
-         productName: "Produk A",
-         unit: "pcs",
-         price: 10000,
-         isActive: true,
-      },
-      {
-         variantId: "V002",
-         productId: "P002",
-         productName: "Produk B",
-         unit: "pcs",
-         price: 20000,
-         isActive: true,
-      },
-   ],
-);
+export const listPosVariants = new ListPosVariants({
+   catalogReadRepo,
+});
 
 /* ======================
    SALES USE CASES
@@ -125,3 +119,23 @@ export const cancelOrder = new CancelOrder({
    orderRepo,
    inventoryService,
 });
+
+export const payCredit = new PayCredit(
+   orderRepo,
+   paymentRepo,
+   transactionRunner,
+);
+
+/* ======================
+   PROCUREMENT USE CASES
+   ====================== */
+
+export const cancelPurchaseOrder = new CancelPurchaseOrder({
+   purchaseOrderRepo,
+});
+
+/* ======================
+   SYSTEM / MAINTENANCE
+   ====================== */
+
+export const toggleMaintenance = new ToggleMaintenance(systemStateRepo);

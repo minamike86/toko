@@ -19,10 +19,11 @@ import { PrismaTransactionRunner } from "@/modules/sales/infrastructure/PrismaTr
 import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
+import { UserRole } from "@/modules/user/domain/UserRole";
 
 const actor = {
   actorId: "user-1",
-  role: "SALES",
+  role: UserRole.SALES,
 } as const;
 
 const PRODUCT_ID = "P001";
@@ -125,11 +126,10 @@ describe.sequential("PayCredit Prisma Integration", () => {
   const payCredit = new PayCredit(
     orderRepository,
     paymentRepository,
-    transactionRunner
+    transactionRunner,
   );
 
   beforeEach(async () => {
-    // child tables dulu, baru parent tables
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
@@ -262,7 +262,7 @@ describe.sequential("PayCredit Prisma Integration", () => {
         paidAt: new Date("2026-01-04T10:00:00.000Z"),
         method: "TRANSFER",
         actor,
-      })
+      }),
     ).rejects.toBeInstanceOf(PaymentOverpayError);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));
@@ -320,7 +320,7 @@ describe.sequential("PayCredit Prisma Integration", () => {
     expect(
       rejectedReason instanceof PaymentOverpayError ||
       rejectedReason instanceof OptimisticLockConflictError ||
-      rejectedReason instanceof OrderNotOnCreditError
+      rejectedReason instanceof OrderNotOnCreditError,
     ).toBe(true);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));
@@ -382,7 +382,7 @@ describe.sequential("PayCredit Prisma Integration", () => {
     expect(
       rejectedReason instanceof PaymentOverpayError ||
       rejectedReason instanceof OptimisticLockConflictError ||
-      rejectedReason instanceof OrderNotOnCreditError
+      rejectedReason instanceof OrderNotOnCreditError,
     ).toBe(true);
 
     const updatedOrder = await orderRepository.findById(EntityId.of(orderId));

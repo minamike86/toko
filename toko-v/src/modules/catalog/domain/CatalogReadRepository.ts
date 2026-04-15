@@ -10,6 +10,7 @@ export type CatalogVariantReadModel = {
   variantId: string;
   productId: string;
   productName: string;
+  variantName: string;
   unit: string;
   price: number;
   isActive: boolean;
@@ -18,4 +19,5 @@ export type CatalogVariantReadModel = {
 export interface CatalogReadRepository {
   getProductsByIds(ids: string[]): Promise<CatalogProductSnapshot[]>;
   getVariantsByIds(ids: string[]): Promise<CatalogVariantReadModel[]>;
+  listPosVariants(): Promise<CatalogVariantReadModel[]>;
 }

@@ -16,6 +16,7 @@ import { Money } from "@/shared/value-objects/Money";
 import { NotFoundError } from "@/shared/errors/ApplicationError";
 import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
 import { ActorContext } from "@/shared/system/types/actor-context";
+import { UserRole } from "@/modules/user/domain/UserRole";
 
 import { TransactionRunner } from "./ports/TransactionRunner";
 
@@ -35,8 +36,10 @@ export class PayCredit {
   }): Promise<void> {
     const { orderId, amount, paidAt, method, actor } = input;
 
-    AuthorizationGuard.assertActorExists(actor);
-    AuthorizationGuard.assertRole(actor, ["ADMIN", "SALES"]);
+    AuthorizationGuard.assertAuthorized(actor, [
+      UserRole.ADMIN,
+      UserRole.SALES,
+    ]);
 
     if (amount <= 0) {
       throw new InvalidPaymentAmountError();
@@ -45,7 +48,9 @@ export class PayCredit {
     const orderIdVO = EntityId.of(orderId);
 
     let attempts = 0;
-    while (attempts < 2) {
+    const maxAttempts = 2;
+
+    while (attempts < maxAttempts) {
       attempts += 1;
 
       try {
@@ -104,16 +109,20 @@ export class PayCredit {
         });
 
         return;
-      } catch (err) {
-        if (err instanceof OptimisticLockConflictError) {
-          if (attempts >= 2) {
-            throw err;
+      } catch (error: unknown) {
+        if (this.isOptimisticLockConflict(error)) {
+          if (attempts >= maxAttempts) {
+            throw new OptimisticLockConflictError();
           }
           continue;
         }
 
-        throw err;
+        throw error;
       }
     }
+  }
+
+  private isOptimisticLockConflict(error: unknown): boolean {
+    return error instanceof OptimisticLockConflictError;
   }
 }

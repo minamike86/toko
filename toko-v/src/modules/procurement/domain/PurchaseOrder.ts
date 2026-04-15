@@ -98,7 +98,9 @@ export class PurchaseOrder {
     private _receivedBy: string | null,
     private _canceledAt: Date | null,
     private _canceledBy: string | null,
-  ) { }
+  ) {
+    this.assertInvariants();
+  }
 
   static create(params: CreatePurchaseOrderParams): PurchaseOrder {
     const id = assertNonEmptyIdentity(params.id);
@@ -185,7 +187,7 @@ export class PurchaseOrder {
       throw new PurchaseOrderAlreadyCanceledError();
     }
 
-    if (this._status === PURCHASE_ORDER_STATUSES.RECEIVED) {
+    if (this._status !== PURCHASE_ORDER_STATUSES.CREATED) {
       throw new PurchaseOrderCannotBeCanceledError();
     }
   }
@@ -195,6 +197,8 @@ export class PurchaseOrder {
     this._status = PURCHASE_ORDER_STATUSES.RECEIVED;
     this._receivedAt = params.receivedAt;
     this._receivedBy = assertNonEmptyIdentity(params.receivedBy);
+
+    this.assertInvariants();
   }
 
   cancel(params: CancelPurchaseOrderParams): void {
@@ -202,5 +206,40 @@ export class PurchaseOrder {
     this._status = PURCHASE_ORDER_STATUSES.CANCELED;
     this._canceledAt = params.canceledAt;
     this._canceledBy = assertNonEmptyIdentity(params.canceledBy);
+
+    this.assertInvariants();
+  }
+
+  private assertInvariants(): void {
+    if (this._status === PURCHASE_ORDER_STATUSES.CREATED) {
+      if (
+        this._receivedAt !== null ||
+        this._receivedBy !== null ||
+        this._canceledAt !== null ||
+        this._canceledBy !== null
+      ) {
+        throw new Error("CREATED purchase order must not have receive/cancel metadata");
+      }
+    }
+
+    if (this._status === PURCHASE_ORDER_STATUSES.RECEIVED) {
+      if (this._receivedAt === null || this._receivedBy === null) {
+        throw new Error("RECEIVED purchase order must have receive metadata");
+      }
+
+      if (this._canceledAt !== null || this._canceledBy !== null) {
+        throw new Error("RECEIVED purchase order must not have cancel metadata");
+      }
+    }
+
+    if (this._status === PURCHASE_ORDER_STATUSES.CANCELED) {
+      if (this._canceledAt === null || this._canceledBy === null) {
+        throw new Error("CANCELED purchase order must have cancel metadata");
+      }
+
+      if (this._receivedAt !== null || this._receivedBy !== null) {
+        throw new Error("CANCELED purchase order must not have receive metadata");
+      }
+    }
   }
 }

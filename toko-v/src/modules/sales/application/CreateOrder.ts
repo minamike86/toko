@@ -54,8 +54,10 @@ export class CreateOrder {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: CreateOrderInput): Promise<CreateOrderResult> {
-    AuthorizationGuard.assertActorExists(input.actor);
-    AuthorizationGuard.assertRole(input.actor, ["ADMIN", "SALES"]);
+    const actor = AuthorizationGuard.assertAuthorized(input.actor, [
+      "ADMIN",
+      "SALES",
+    ]);
 
     const variants = await this.deps.catalogReadRepo.getVariantsByIds(
       input.items.map((i) => i.variantId),
@@ -90,7 +92,7 @@ export class CreateOrder {
       type: input.type,
       items: orderItems,
       createdAt: new Date(),
-      createdBy: EntityId.of(input.actor.actorId),
+      createdBy: EntityId.of(actor.actorId),
     });
 
     await this.deps.orderRepo.save(order);

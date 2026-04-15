@@ -6,10 +6,9 @@ import {
   NotFoundError,
 } from "@/shared/errors/ApplicationError";
 import { ActorContext } from "@/shared/system/types/actor-context";
+import { UserRole } from "@/modules/user/domain/UserRole";
 
-const PROCUREMENT_ALLOWED_ROLES = {
-  ADMIN: "ADMIN",
-} as const;
+
 
 export class UpdateSupplierStatus {
   constructor(private readonly supplierRepository: SupplierRepository) { }
@@ -18,8 +17,7 @@ export class UpdateSupplierStatus {
     input: UpdateSupplierStatusInput,
     actor: ActorContext,
   ): Promise<SupplierDto> {
-    AuthorizationGuard.assertActorExists(actor);
-    AuthorizationGuard.assertRole(actor, [PROCUREMENT_ALLOWED_ROLES.ADMIN]);
+    AuthorizationGuard.assertAuthorized(actor, [UserRole.ADMIN]);
 
     const supplier = await this.supplierRepository.findById(input.supplierId);
 
