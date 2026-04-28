@@ -1,127 +1,128 @@
-import { OrderRepository } from "@/modules/sales/domain/OrderRepository";
-import { AuthorizationGuard } from "./guards/AuthorizationGuard";
+import { randomUUID } from "crypto";
+
+import { OrderRepository } from "../domain/OrderRepository";
+import { PaymentRepository } from "../domain/PaymentRepository";
+import { Payment } from "../domain/Payment";
+import { OrderStatus } from "../domain/OrderStatus";
+import {
+  InvalidPaymentAmountError,
+  PaymentOverpayError,
+  OrderNotOnCreditError,
+  OptimisticLockConflictError,
+} from "../domain/SalesErrors";
+
 import { EntityId } from "@/shared/value-objects/EntityId";
+import { Money } from "@/shared/value-objects/Money";
 import { NotFoundError } from "@/shared/errors/ApplicationError";
-import { OrderStatus } from "@/modules/sales/domain/OrderStatus";
-import { Money } from '@/shared/value-objects/Money';
+import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
+import { ActorContext } from "@/shared/system/types/actor-context";
+import { UserRole } from "@/modules/user/domain/UserRole";
 
-//===========================================================
-import { PaymentRepository } from '@/modules/sales/domain/PaymentRepository';
-import { Payment } from '@/modules/sales/domain/Payment';
-import { randomUUID } from 'crypto';
+import { TransactionRunner } from "./ports/TransactionRunner";
 
-const paymentId = EntityId.of(randomUUID());
-
-
-
-/**
- * Actor context (application boundary)
- */
-interface Actor {
-  id: string;
-  role: "ADMIN" | "KASIR";
-}
-
-/**
- * PayCredit Use Case
- *
- * Application rule:
- * - HANYA order dengan status ON_CREDIT yang boleh dibayar
- * - Rule ini adalah policy use case, BUKAN invariant domain
- */
 export class PayCredit {
   constructor(
     private readonly orderRepository: OrderRepository,
-    private readonly paymentRepository: PaymentRepository
-  ) {}
+    private readonly paymentRepository: PaymentRepository,
+    private readonly transactionRunner: TransactionRunner,
+  ) { }
 
-  async execute(input: { 
-    orderId: string; 
+  async execute(input: {
+    orderId: string;
     amount: number;
-    occurredAt: Date;
-    actor: Actor;
-   }): Promise<void> {
-    const {  orderId, amount, occurredAt, actor } = input;
+    paidAt: Date;
+    method: string;
+    actor: ActorContext;
+  }): Promise<void> {
+    const { orderId, amount, paidAt, method, actor } = input;
 
-    /**
-     * Authorization boundary
-     */
-    AuthorizationGuard.allowRoles(actor, ["ADMIN", "KASIR"]);
-
-    /**
-     * Load aggregate
-     */
-    const orderIdVO = EntityId.of(orderId);
-    const order = await this.orderRepository.findById(orderIdVO);
-
-    if (!order) {
-      throw new NotFoundError("Order", orderIdVO.toString());
-    }
-
-    /**
-     * APPLICATION POLICY (EXPLICIT)
-     *
-     * PayCredit hanya berlaku untuk order ON_CREDIT.
-     * Status lain (CREATED, PAID, CANCELED) harus ditolak di sini,
-     * bukan di domain.
-     */
-    if (order.getStatus() !== OrderStatus.ON_CREDIT) {
-      throw new Error("Order is not on credit");
-      /**
-       * Sengaja generic:
-       * - test hanya butuh reject
-       * - tidak bocorkan detail domain
-       * - sesuai error-handling-guidelines (application rule)
-       */
-    }
+    AuthorizationGuard.assertAuthorized(actor, [
+      UserRole.ADMIN,
+      UserRole.SALES,
+    ]);
 
     if (amount <= 0) {
-      throw new Error('Payment amount must be greater than zero');
+      throw new InvalidPaymentAmountError();
     }
 
-    /**
-     * Domain invariant check
-     */
-    const paymentAmount = Money.of(amount);
+    const orderIdVO = EntityId.of(orderId);
 
-    if (paymentAmount.get() > order.getOutstandingAmount().get()) {
-       throw new Error('Payment amount exceeds outstanding amount');
+    let attempts = 0;
+    const maxAttempts = 2;
+
+    while (attempts < maxAttempts) {
+      attempts += 1;
+
+      try {
+        await this.transactionRunner.runInTransaction(async (tx) => {
+          const order = await this.orderRepository.findById(orderIdVO, tx);
+          if (!order) {
+            throw new NotFoundError("Order", orderIdVO.toString());
+          }
+
+          if (order.getStatus() !== OrderStatus.ON_CREDIT) {
+            throw new OrderNotOnCreditError();
+          }
+
+          const totalPaidBeforeNumber =
+            await this.paymentRepository.sumAmountByOrderId(
+              orderIdVO.toString(),
+              tx,
+            );
+
+          const totalPaidBefore =
+            totalPaidBeforeNumber === 0
+              ? Money.zero()
+              : Money.of(totalPaidBeforeNumber);
+
+          const totalPaidAfterNumber = totalPaidBefore.get() + amount;
+
+          if (totalPaidAfterNumber > order.getTotalAmount().get()) {
+            throw new PaymentOverpayError();
+          }
+
+          const payment = new Payment(
+            randomUUID(),
+            orderIdVO.toString(),
+            amount,
+            paidAt,
+            method,
+            new Date(),
+          );
+
+          await this.paymentRepository.save(payment, tx);
+
+          const totalPaidAfter =
+            totalPaidAfterNumber === 0
+              ? Money.zero()
+              : Money.of(totalPaidAfterNumber);
+
+          const expectedVersion = order.getVersion();
+
+          order.recomputeOutstanding(totalPaidAfter);
+
+          await this.orderRepository.saveWithVersionCheck(
+            order,
+            expectedVersion,
+            tx,
+          );
+        });
+
+        return;
+      } catch (error: unknown) {
+        if (this.isOptimisticLockConflict(error)) {
+          if (attempts >= maxAttempts) {
+            throw new OptimisticLockConflictError();
+          }
+          continue;
+        }
+
+        throw error;
+      }
     }
+  }
 
-
-
-     /**
-     * Create payment fact
-     */
-    const payment = new Payment(
-      EntityId.of(randomUUID()).toString(),
-      orderIdVO.toString(),
-      amount,
-      occurredAt,
-      new Date(),
-    );
-
-    /**
-     * Persist payment
-     */
-    await this.paymentRepository.save(payment);
-
-    /**
-     * Recompute order state from facts
-     */
-   const totalPaidNumber =
-    await this.paymentRepository.sumAmountByOrderId(orderIdVO.toString());
-
-    const totalPaidMoney =
-      totalPaidNumber === 0 ? Money.zero() : Money.of(totalPaidNumber);
-
-    order.recomputeOutstanding(totalPaidMoney);
-
-
-
-    /**
-     * Persist state
-     */
-    await this.orderRepository.save(order);
+  private isOptimisticLockConflict(error: unknown): boolean {
+    return error instanceof OptimisticLockConflictError;
   }
 }

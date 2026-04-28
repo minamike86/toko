@@ -1,8 +1,6 @@
-// src/modules/reporting/dto/credit-outstanding.dto.ts
-
 export type CreditOutstandingDetailDTO = {
   orderId: string;
-  orderDate: Date;
+  createdAt: Date;
   orderType: string;
   totalAmount: number;
   outstandingAmount: number;

@@ -26,19 +26,22 @@ export async function seedStockMovement(
     throw new Error("seedStockMovement: quantity must be > 0");
   }
 
+  const origin = type === "ADJUST" ? "MANUAL_ADJUSTMENT" : "LEGACY";
+
   await prisma.stockMovement.upsert({
     where: { id },
     create: {
       id,
       productId,
       type,
+      origin,
       quantity,
       occurredAt,
       reason,
       referenceId,
     },
     update: {
-      // movement immutable → no-op
+      // movement immutable -> no-op
     },
   });
 }

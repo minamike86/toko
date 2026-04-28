@@ -8,6 +8,10 @@ describe.sequential("Credit Outstanding Report – Integration Test", () => {
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
+    await prisma.stockMovement.deleteMany();
+    await prisma.inventoryItem.deleteMany();
+    await prisma.productVariant.deleteMany();
+    await prisma.product.deleteMany();
   });
 
   it("returns ONLY valid ON_CREDIT outstanding orders", async () => {

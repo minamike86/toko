@@ -14,7 +14,15 @@ import { PrismaClient } from "@prisma/client";
  *
  * Keputusan ini dikunci di:
  * docs/03-mvp/MVP-step-3/architecture/prisma-client-and-reporting-test-db-strategy.md
- */
+ * 
+ * process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+
+ * terlalu rame
+ * 
+ * 
+*/
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;

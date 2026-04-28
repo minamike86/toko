@@ -6,13 +6,14 @@ import { OrderItem } from "./OrderItem";
 import { OrderStatus } from "./OrderStatus";
 import { OrderType } from "./OrderType";
 import {
-  EmptyOrderItemsError,  InvalidOrderStatusTransitionError,   OrderAlreadyCanceledError,
+  EmptyOrderItemsError, InvalidOrderStatusTransitionError, OrderAlreadyCanceledError,
 } from "./SalesErrors";
 
 export class Order {
   private status: OrderStatus;
   private totalAmount: Money;
   private outstandingAmount: Money;
+  private version: number;
 
   private constructor(
     readonly id: EntityId,
@@ -22,13 +23,16 @@ export class Order {
     totalAmount: Money,
     outstandingAmount: Money,
     readonly createdAt: Date,
-    readonly createdBy: EntityId
+    readonly createdBy: EntityId,
+    version: number
+
   ) {
     if (items.length === 0) throw new EmptyOrderItemsError();
 
     this.status = status;
     this.totalAmount = totalAmount;
     this.outstandingAmount = outstandingAmount;
+    this.version = version;
 
     this.assertInvariants();
   }
@@ -57,7 +61,8 @@ export class Order {
       total,
       total,
       params.createdAt,
-      params.createdBy
+      params.createdBy,
+      0
     );
   }
 
@@ -75,6 +80,14 @@ export class Order {
 
   getOutstandingAmount(): Money {
     return this.outstandingAmount;
+  }
+
+  /**
+   * Returns the optimistic locking version of the order. Persisting an order
+   * must increment this value.
+   */
+  getVersion(): number {
+    return this.version;
   }
 
   /* =====================
@@ -151,6 +164,8 @@ export class Order {
     this.assertInvariants();
   }
 
+
+
   /* =====================
      Invariants
      ===================== */
@@ -179,46 +194,91 @@ export class Order {
     }
   }
 
+  /* =====================
+     Persistence
+     ===================== */
+  /**
+   * Returns a plain object suitable for persistence. The version field is
+   * included so that repositories can use it as a precondition for
+   * optimistic locking. The repository is responsible for incrementing
+   * the version when persisting.
+   */
+  toPrimitives(): {
+    id: string;
+    type: OrderType;
+    items: OrderItem[];
+    status: OrderStatus;
+    totalAmount: number;
+    outstandingAmount: number;
+    createdAt: Date;
+    createdBy: string;
+    version: number;
+  } {
+    return {
+      id: this.id.toString(),
+      type: this.type,
+      items: this.items,
+      status: this.status,
+      totalAmount: this.totalAmount.get(),
+      outstandingAmount: this.outstandingAmount.get(),
+      createdAt: this.createdAt,
+      createdBy: this.createdBy.toString(),
+      version: this.version,
+    };
+  }
+
   static reconstitute(params: {
-  id: EntityId;
-  type: OrderType;
-  status: OrderStatus;
-  items: OrderItem[];
-  totalAmount: Money;
-  outstandingAmount: Money;
-  createdAt: Date;
-  createdBy: EntityId;
-}): Order {
-  return new Order(
-    params.id,
-    params.type,
-    params.items,
-    params.status,
-    params.totalAmount,
-    params.outstandingAmount,
-    params.createdAt,
-    params.createdBy
-  );
-}
-
-public recomputeOutstanding(totalPaid: Money): void {
-  const totalAmountNumber = this.totalAmount.get();
-  const totalPaidNumber = totalPaid.get();
-
-  if (totalPaidNumber > totalAmountNumber) {
-    throw new DomainError('Total paid melebihi total order');
+    id: EntityId;
+    type: OrderType;
+    status: OrderStatus;
+    items: OrderItem[];
+    totalAmount: Money;
+    outstandingAmount: Money;
+    createdAt: Date;
+    createdBy: EntityId;
+    version: number;
+  }): Order {
+    return new Order(
+      params.id,
+      params.type,
+      params.items,
+      params.status,
+      params.totalAmount,
+      params.outstandingAmount,
+      params.createdAt,
+      params.createdBy,
+      params.version,
+    );
   }
 
-  const newOutstanding = totalAmountNumber - totalPaidNumber;
+  public recomputeOutstanding(totalPaid: Money): void {
+    const totalAmountNumber = this.totalAmount.get();
+    const totalPaidNumber = totalPaid.get();
 
-  // newOutstanding boleh 0, tapi Money.of(0) akan throw (karena aturan Money.of > 0)
-  if (newOutstanding === 0) {
-    this.outstandingAmount = Money.zero();
-    this.status = OrderStatus.PAID;
-    return;
+    if (totalPaidNumber > totalAmountNumber) {
+      throw new DomainError('Total paid melebihi total order');
+    }
+
+    const newOutstanding = totalAmountNumber - totalPaidNumber;
+
+    // newOutstanding boleh 0, tapi Money.of(0) akan throw (karena aturan Money.of > 0)
+    if (newOutstanding === 0) {
+      this.outstandingAmount = Money.zero();
+      this.status = OrderStatus.PAID;
+      return;
+    }
+
+    this.outstandingAmount = Money.of(newOutstanding);
   }
 
-  this.outstandingAmount = Money.of(newOutstanding);
-}
+  /**
+  * Internal method used by repositories to increment the version. This
+  * method should not be called by application code outside the persistence
+  * layer. The increment happens after the entity has been successfully
+  * persisted.
+  */
+  _incrementVersion(): void {
+    this.version += 1;
+  }
 
 }

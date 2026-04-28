@@ -1,41 +1,33 @@
-import { Order } from '@/modules/sales/domain/Order';
-import { OrderType } from '@/modules/sales/domain/OrderType';
-import { EntityId } from '@/shared/value-objects/EntityId';
-import { createDummyOrderItem } from './createDummyOrderItem';
+import { Order } from "@/modules/sales/domain/Order";
+import { OrderType } from "@/modules/sales/domain/OrderType";
+import { EntityId } from "@/shared/value-objects/EntityId";
+import { createDummyOrderItem } from "./createDummyOrderItem";
 
-/**
- * Helper test untuk membuat Order dengan total tertentu
- * TANPA melanggar kontrak domain.
- *
- * Asumsi:
- * - createDummyOrderItem menghasilkan item dengan harga 10.000
- */
-export function createOrderWithTotal(params: {
+type Params = {
   orderId: string;
   total: number;
-  createdBy: string;
-}): Order {
-  const { orderId, total, createdBy } = params;
+  createdBy?: string;
+  type?: OrderType;
+};
 
-  const unitPrice = 10_000;
-
-  if (total % unitPrice !== 0) {
-    throw new Error(
-      'createOrderWithTotal hanya mendukung total kelipatan 10.000',
-    );
-  }
-
-  const itemCount = total / unitPrice;
-
-  const items = Array.from({ length: itemCount }, () =>
-    createDummyOrderItem(orderId),
-  );
+export function createOrderWithTotal(params: Params): Order {
+  const quantity = 1;
 
   return Order.create({
-    id: EntityId.of(orderId),
-    type: OrderType.OFFLINE,
-    items,
+    id: EntityId.of(params.orderId),
+    type: params.type ?? OrderType.OFFLINE,
+    items: [
+      createDummyOrderItem({
+        orderId: params.orderId,
+        productId: "P001",
+        variantId: "V001",
+        productNameSnapshot: "Produk Dummy",
+        unitSnapshot: "pcs",
+        unitPrice: params.total,
+        quantity,
+      }),
+    ],
     createdAt: new Date(),
-    createdBy: EntityId.of(createdBy),
+    createdBy: EntityId.of(params.createdBy ?? "USER-1"),
   });
 }

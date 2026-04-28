@@ -10,6 +10,7 @@ import { OrderType } from "@/modules/sales/domain/OrderType";
 import {
   CatalogReadRepository,
   CatalogProductSnapshot,
+  CatalogVariantReadModel,
 } from "@/modules/catalog/domain/CatalogReadRepository";
 
 import {
@@ -21,11 +22,12 @@ import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
 
-import { NotFoundError } from "@/shared/errors/ApplicationError";
-import { use } from "react";
-/* ======================================================
-   Test Doubles
-   ====================================================== */
+import {
+  NotFoundError,
+  ForbiddenError,
+} from "@/shared/errors/ApplicationError";
+import { OptimisticLockConflictError } from "@/modules/sales/domain/SalesErrors";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 class InMemoryOrderRepository implements OrderRepository {
   private readonly store = new Map<string, Order>();
@@ -34,8 +36,24 @@ class InMemoryOrderRepository implements OrderRepository {
     this.store.set(order.id.toString(), order);
   }
 
-  async findById(id: EntityId): Promise<Order | null> {
+  async findById(id: EntityId, _tx?: unknown): Promise<Order | null> {
     return this.store.get(id.toString()) ?? null;
+  }
+
+  async saveWithVersionCheck(
+    order: Order,
+    expectedVersion: number,
+    _tx?: unknown,
+  ): Promise<void> {
+    const existing = this.store.get(order.id.toString());
+    const currentVersion = existing?.getVersion();
+
+    if (currentVersion === undefined || currentVersion !== expectedVersion) {
+      throw new OptimisticLockConflictError();
+    }
+
+    order._incrementVersion();
+    this.store.set(order.id.toString(), order);
   }
 }
 
@@ -50,34 +68,63 @@ class FakeCatalogReadRepository implements CatalogReadRepository {
     },
   ];
 
-  async getProductsByIds(
-    ids: string[]
-  ): Promise<CatalogProductSnapshot[]> {
+  private readonly variants: CatalogVariantReadModel[] = [
+    {
+      variantId: "V001",
+      productId: "P001",
+      productName: "Produk Test",
+      variantName: "Default",
+      unit: "pcs",
+      price: 10000,
+      isActive: true,
+    },
+  ];
+
+  async getProductsByIds(ids: string[]): Promise<CatalogProductSnapshot[]> {
     return this.products.filter((p) => ids.includes(p.productId));
+  }
+
+  async getVariantsByIds(ids: string[]): Promise<CatalogVariantReadModel[]> {
+    return this.variants.filter((v) => ids.includes(v.variantId));
+  }
+
+  async listPosVariants(): Promise<CatalogVariantReadModel[]> {
+    return this.variants.filter((v) => v.isActive);
   }
 }
 
 class SpyInventoryService implements InventoryService {
   public issued: IssueStockRequest[] = [];
+  public returned: IssueStockRequest[] = [];
 
   async issueStock(requests: IssueStockRequest[]): Promise<void> {
     this.issued.push(...requests);
   }
 
   async returnStock(requests: IssueStockRequest[]): Promise<void> {
-    this.issued.push(...requests);
+    this.returned.push(...requests);
   }
 }
-/* ======================================================
-   Tests
-   ====================================================== */
 
 describe("CancelOrder Use Case", () => {
-
   let useCase: CancelOrder;
   let orderRepo: InMemoryOrderRepository;
-  let inventoryService: SpyInventoryService; 
-  
+  let inventoryService: SpyInventoryService;
+
+  const salesActor: ActorContext = {
+    actorId: "USER-1",
+    role: "SALES",
+  };
+
+  const adminActor: ActorContext = {
+    actorId: "ADMIN-1",
+    role: "ADMIN",
+  };
+
+  const warehouseActor: ActorContext = {
+    actorId: "WH-1",
+    role: "WAREHOUSE",
+  };
 
   beforeEach(() => {
     orderRepo = new InMemoryOrderRepository();
@@ -90,10 +137,6 @@ describe("CancelOrder Use Case", () => {
   });
 
   it("cancels CREATED order tanpa menyentuh inventory", async () => {
-    const orderRepo = new InMemoryOrderRepository();
-    const inventoryService = new SpyInventoryService();
-
-    // Order CREATED dibuat langsung via domain
     const order = Order.create({
       id: EntityId.of("ORD-300"),
       type: OrderType.OFFLINE,
@@ -101,6 +144,7 @@ describe("CancelOrder Use Case", () => {
         OrderItem.create({
           id: EntityId.of("ITEM-1"),
           productId: EntityId.of("P001"),
+          variantId: EntityId.of("V001"),
           productNameSnapshot: "Produk Test",
           unitSnapshot: "pcs",
           unitPriceSnapshot: Money.of(10000),
@@ -113,57 +157,44 @@ describe("CancelOrder Use Case", () => {
 
     await orderRepo.save(order);
 
-    const cancelOrder = new CancelOrder({
-      orderRepo,
-      inventoryService,
-    });
-
-    const result = await cancelOrder.execute({
+    const result = await useCase.execute({
       orderId: "ORD-300",
-      canceledBy: "USER-1",
+      actor: adminActor,
     });
 
     expect(result.status).toBe(OrderStatus.CANCELED);
     expect(inventoryService.issued).toHaveLength(0);
+    expect(inventoryService.returned).toHaveLength(0);
   });
 
   it("cancels PAID order dan mengembalikan stok", async () => {
-    const orderRepo = new InMemoryOrderRepository();
-    const inventoryService = new SpyInventoryService();
-
     const createOrder = new CreateOrder({
       orderRepo,
       catalogReadRepo: new FakeCatalogReadRepository(),
       inventoryService,
     });
 
-    // Buat order PAID
     await createOrder.execute({
       orderId: "ORD-301",
       type: OrderType.OFFLINE,
       payment: "CASH",
-      createdBy: "USER-1",
-      items: [{ productId: "P001", quantity: 2 }],
+      actor: salesActor,
+      items: [{ variantId: "V001", quantity: 2 }],
     });
 
-    // Reset spy karena CreateOrder sudah issue stock
     inventoryService.issued = [];
+    inventoryService.returned = [];
 
-    const cancelOrder = new CancelOrder({
-      orderRepo,
-      inventoryService,
-    });
-
-    const result = await cancelOrder.execute({
+    const result = await useCase.execute({
       orderId: "ORD-301",
-      canceledBy: "USER-1",
+      actor: adminActor,
     });
 
     expect(result.status).toBe(OrderStatus.CANCELED);
-    expect(inventoryService.issued).toHaveLength(1);
+    expect(inventoryService.returned).toHaveLength(1);
 
-    expect(inventoryService.issued[0]).toEqual({
-      productId: "P001",
+    expect(inventoryService.returned[0]).toEqual({
+      variantId: "V001",
       quantity: 2,
       reason: "CANCEL_ORDER",
       referenceId: "ORD-301",
@@ -172,8 +203,19 @@ describe("CancelOrder Use Case", () => {
 
   it("throws NotFoundError when order does not exist", async () => {
     await expect(
-      useCase.execute({ orderId: "missing-id", canceledBy: "user-1" })
+      useCase.execute({
+        orderId: "missing-id",
+        actor: adminActor,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it("rejects unauthorized role", async () => {
+    await expect(
+      useCase.execute({
+        orderId: "ORD-999",
+        actor: warehouseActor,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
 });

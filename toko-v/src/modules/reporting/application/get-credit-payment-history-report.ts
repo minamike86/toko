@@ -1,9 +1,8 @@
-// src/modules/reporting/application/get-credit-payment-history-report.ts
-import {
-  CreditPaymentHistoryReportDTO,
+import type {
   CreditPaymentHistoryDetailDTO,
-} from "../dto/credit-payment-history.dto";
-import { findCreditPaymentHistory } from "../queries/credit-payment-history.query";
+  CreditPaymentHistoryReportDTO,
+} from "@/modules/reporting/dto/credit-payment-history.dto";
+import { findCreditPaymentHistory } from "@/modules/reporting/queries/credit-payment-history.query";
 
 export async function getCreditPaymentHistoryReport(params: {
   from: Date;
@@ -11,22 +10,27 @@ export async function getCreditPaymentHistoryReport(params: {
 }): Promise<CreditPaymentHistoryReportDTO> {
   const rows = await findCreditPaymentHistory(params);
 
-  const details: CreditPaymentHistoryDetailDTO[] = rows.map((r) => ({
-    orderId: r.orderId,
-    paymentDate: r.paymentDate,
-    orderDate: r.orderDate,
-    orderType: r.orderType,
-    totalAmount: r.totalAmount,
-    paidAmount: r.paidAmount,
+  const details: CreditPaymentHistoryDetailDTO[] = rows.map((row) => ({
+    paymentId: row.paymentId,
+    orderId: row.orderId,
+    paymentDate: row.paymentDate,
+    orderDate: row.orderDate,
+    orderType: row.orderType,
+    totalAmount: row.totalAmount,
+    paidAmount: row.paidAmount,
+    method: row.method,
   }));
 
-  const summary = {
-    totalPaidAmount: details.reduce((sum, d) => sum + d.paidAmount, 0),
-    totalPaidOrders: details.length,
-  };
+  const totalPaidAmount = details.reduce(
+    (sum, detail) => sum + detail.paidAmount,
+    0,
+  );
 
   return {
     details,
-    summary,
+    summary: {
+      totalPaidAmount,
+      totalPaidOrders: details.length,
+    },
   };
 }

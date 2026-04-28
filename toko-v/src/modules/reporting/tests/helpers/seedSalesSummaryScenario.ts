@@ -3,13 +3,51 @@ import { prisma } from "@/shared/prisma";
 type SalesSummarySeedCase = {
   orderType: "OFFLINE" | "ONLINE";
   amount: number;
-  occurredAt: Date;
+  paidAt: Date;
+  createdAt?: Date;
 };
 
 function uid(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function ensureProductVariant(productId: string, variantId: string, price: number) {
+  await prisma.product.upsert({
+    where: { id: productId },
+    update: {
+      name: "Test Product",
+      isActive: true,
+    },
+    create: {
+      id: productId,
+      name: "Test Product",
+      brand: null,
+      isActive: true,
+    },
+  });
+
+  await prisma.productVariant.upsert({
+    where: { id: variantId },
+    update: {
+      productId,
+      sku: `SKU-${variantId}`,
+      variantName: "Default",
+      unit: "pcs",
+      basePrice: price,
+      isActive: true,
+    },
+    create: {
+      id: variantId,
+      productId,
+      sku: `SKU-${variantId}`,
+      variantName: "Default",
+      unit: "pcs",
+      sizeLabel: null,
+      colorLabel: null,
+      basePrice: price,
+      isActive: true,
+    },
+  });
 }
 
 export async function seedSalesSummaryScenario(
@@ -18,6 +56,17 @@ export async function seedSalesSummaryScenario(
   for (const c of cases) {
     const orderId = uid("ORDER");
     const itemId = uid("ITEM");
+    const paymentId = uid("PAY");
+    const productId = uid("P");
+    const variantId = uid("V");
+
+    const timestamp = c.paidAt ?? c.createdAt;
+
+    if (!timestamp) {
+      throw new Error("seedSalesSummaryScenario requires paidAt or createdAt");
+    }
+
+    await ensureProductVariant(productId, variantId, c.amount);
 
     await prisma.order.create({
       data: {
@@ -26,12 +75,14 @@ export async function seedSalesSummaryScenario(
         status: "PAID",
         totalAmount: c.amount,
         outstandingAmount: 0,
-        createdAt: c.occurredAt,
+        createdAt: timestamp,
         createdBy: "test-user",
+        version: 0,
         items: {
           create: {
             id: itemId,
-            productId: uid("P"),
+            productId,
+            variantId,
             productNameSnapshot: "Test Product",
             unitSnapshot: "pcs",
             unitPriceSnapshot: c.amount,
@@ -41,9 +92,11 @@ export async function seedSalesSummaryScenario(
         },
         payments: {
           create: {
-            id: uid("PAY"),
+            id: paymentId,
             amount: c.amount,
-            occurredAt: c.occurredAt,
+            paidAt: timestamp,
+            method: "LEGACY",
+            createdAt: timestamp,
           },
         },
       },

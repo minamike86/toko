@@ -1,6 +1,9 @@
 import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
+import { NotFoundError } from "@/shared/errors/ApplicationError";
+import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
+import { ActorContext } from "@/shared/system/types/actor-context";
 
 import { Order } from "../domain/Order";
 import { OrderItem } from "../domain/OrderItem";
@@ -16,24 +19,13 @@ import {
 
 import { InactiveProductError } from "../domain/SalesErrors";
 
-/**
- * Application-level error: entity tidak ditemukan (bukan domain invariant).
- * Dibuat lokal agar patch ini tidak memerlukan file baru.
- */
-export class NotFoundError extends Error {
-  readonly name = "NotFoundError";
-  constructor(public readonly entity: string, public readonly id: string) {
-    super(`${entity} not found: ${id}`);
-  }
-}
-
 export type CreateOrderInput = {
   orderId: string;
   type: OrderType;
   payment: "CASH" | "CREDIT";
-  createdBy: string;
+  actor: ActorContext;
   items: Array<{
-    productId: string;
+    variantId: string;
     quantity: number;
   }>;
 };
@@ -52,32 +44,52 @@ type Deps = {
 };
 
 export class CreateOrder {
-  constructor(private readonly deps: Deps) {}
+  constructor(private readonly deps: Deps) { }
 
   async execute(input: CreateOrderInput): Promise<CreateOrderResult> {
-    const products = await this.deps.catalogReadRepo.getProductsByIds(
-      input.items.map((i) => i.productId)
+    console.info("[CreateOrder] input:", input);
+
+    const actor = AuthorizationGuard.assertAuthorized(input.actor, [
+      "ADMIN",
+      "SALES",
+    ]);
+
+    const variants = await this.deps.catalogReadRepo.getVariantsByIds(
+      input.items.map((item) => item.variantId),
     );
 
-    const productMap = new Map(products.map((p) => [p.productId, p]));
+    console.info("[CreateOrder] variants found:", variants);
+
+    const variantMap = new Map(variants.map((variant) => [variant.variantId, variant]));
 
     const orderItems = input.items.map((line) => {
-      const product = productMap.get(line.productId);
-      if (!product) {
-        // Not Found adalah concern application, bukan domain invariant
-        throw new NotFoundError("Product", line.productId);
+      const variant = variantMap.get(line.variantId);
+
+      if (!variant) {
+        console.error("[CreateOrder] variant not found:", {
+          requestedVariantId: line.variantId,
+          availableVariantIds: variants.map((item) => item.variantId),
+        });
+
+        throw new NotFoundError("ProductVariant", line.variantId);
       }
 
-      if (!product.isActive) {
-        throw new InactiveProductError(product.productId);
+      if (!variant.isActive) {
+        console.error("[CreateOrder] inactive variant:", {
+          variantId: variant.variantId,
+          productId: variant.productId,
+        });
+
+        throw new InactiveProductError(variant.productId);
       }
 
       return OrderItem.create({
-        id: EntityId.of(`${input.orderId}:${product.productId}`),
-        productId: EntityId.of(product.productId),
-        productNameSnapshot: product.name,
-        unitSnapshot: product.unit,
-        unitPriceSnapshot: Money.of(product.price),
+        id: EntityId.of(`${input.orderId}:${variant.variantId}`),
+        productId: EntityId.of(variant.productId),
+        variantId: EntityId.of(variant.variantId),
+        productNameSnapshot: variant.productName,
+        unitSnapshot: variant.unit,
+        unitPriceSnapshot: Money.of(variant.price),
         quantity: PositiveInt.of(line.quantity),
       });
     });
@@ -87,29 +99,44 @@ export class CreateOrder {
       type: input.type,
       items: orderItems,
       createdAt: new Date(),
-      createdBy: EntityId.of(input.createdBy),
+      createdBy: EntityId.of(actor.actorId),
     });
 
-    // simpan fakta awal (CREATED)
     await this.deps.orderRepo.save(order);
 
     try {
       const requests: IssueStockRequest[] = orderItems.map((item) => ({
-        productId: item.productId.toString(),
+        variantId: item.variantId.toString(),
         quantity: item.quantity.get(),
         reason: "SALE_ORDER",
         referenceId: order.id.toString(),
       }));
 
+      console.info("[CreateOrder] issueStock requests:", requests);
+
       await this.deps.inventoryService.issueStock(requests);
-    } catch (error) {
-      // inventory gagal → order FAILED
+    } catch (error: unknown) {
+      console.error("[CreateOrder] issueStock failed:", error);
+      console.error(
+        "[CreateOrder] issueStock meta:",
+        error instanceof Error
+          ? {
+            name: error.name,
+            message: error.message,
+            constructorName: error.constructor.name,
+            stack: error.stack,
+          }
+          : {
+            type: typeof error,
+            value: error,
+          },
+      );
+
       order.markAsFailed();
       await this.deps.orderRepo.save(order);
       throw error;
     }
 
-    // inventory berhasil → baru tentukan status pembayaran
     if (input.payment === "CASH") {
       order.markAsPaid();
     } else {
