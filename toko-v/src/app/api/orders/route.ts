@@ -2,17 +2,26 @@ import { NextResponse } from "next/server";
 import { OrderType } from "@/modules/sales/domain/OrderType";
 import { createOrder } from "@/wiring/container";
 import { listPosOrders } from "@/modules/reporting/application/ListPosOrders";
-
-type ErrorResponse = {
-  error: string;
-  message: string;
-};
+import { parseActorContext } from "@/shared/delivery/parse-actor-context";
+import { mapHttpError } from "@/shared/delivery/map-http-error";
 
 type PosOrderStatusFilter =
   | "ALL"
   | "ON_CREDIT"
   | "PAID"
   | "CANCELED";
+
+type CreateOrderRequestBody = {
+  orderId: string;
+  type: OrderType;
+  payment: "CASH" | "CREDIT";
+  items: Array<{
+    variantId: string;
+    quantity: number;
+  }>;
+  actorId: string;
+  role: string;
+};
 
 function toStatusFilter(value: string | null): PosOrderStatusFilter {
   if (
@@ -36,43 +45,46 @@ export async function GET(req: Request) {
 
     return NextResponse.json(orders, { status: 200 });
   } catch (error: unknown) {
-    const response = mapErrorToResponse(error);
-    return NextResponse.json(response, { status: 400 });
+    const mapped = mapHttpError(error);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 
 export async function POST(req: Request) {
-  const body = await req.json();
-
   try {
+    const body = (await req.json()) as CreateOrderRequestBody;
+    const actor = parseActorContext({
+      actorId: body.actorId,
+      role: body.role,
+    });
+
     const result = await createOrder.execute({
       orderId: body.orderId,
-      type: body.type as OrderType,
+      type: body.type,
       payment: body.payment,
       items: body.items,
-      actor: {
-        actorId: body.actorId,
-        role: body.role,
-      },
+      actor,
     });
 
     return NextResponse.json(result, { status: 201 });
   } catch (error: unknown) {
-    const response = mapErrorToResponse(error);
-    return NextResponse.json(response, { status: 400 });
-  }
-}
+    console.error("[POST /api/orders] failed:", error);
+    console.error(
+      "[POST /api/orders] meta:",
+      error instanceof Error
+        ? {
+          name: error.name,
+          message: error.message,
+          constructorName: error.constructor.name,
+          stack: error.stack,
+        }
+        : {
+          type: typeof error,
+          value: error,
+        },
+    );
 
-function mapErrorToResponse(error: unknown): ErrorResponse {
-  if (error instanceof Error) {
-    return {
-      error: error.name,
-      message: error.message,
-    };
+    const mapped = mapHttpError(error);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
-
-  return {
-    error: "UnknownError",
-    message: "Terjadi kesalahan yang tidak terduga.",
-  };
 }

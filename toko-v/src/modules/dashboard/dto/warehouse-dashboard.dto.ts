@@ -5,7 +5,6 @@ export type WarehouseDashboardItemDTO = {
   variantName: string;
   unit: string;
   currentStockQuantity: number;
-  lowStockThreshold: number;
   isLowStock: boolean;
 };
 

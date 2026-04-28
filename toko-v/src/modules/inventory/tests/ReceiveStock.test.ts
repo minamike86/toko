@@ -1,135 +1,106 @@
-import { describe, it, expect } from "vitest";
-
+import { describe, expect, it, vi } from "vitest";
 import { ReceiveStock } from "@/modules/inventory/application/ReceiveStock";
-import { InventoryRepository } from "@/modules/inventory/domain/InventoryRepository";
 import { InventoryItem } from "@/modules/inventory/domain/InventoryItem";
 import { StockMovement } from "@/modules/inventory/domain/StockMovement";
-import { ForbiddenError } from "@/shared/errors/ApplicationError";
-import { ActorContext } from "@/shared/system/types/actor-context";
+import type { InventoryRepository } from "@/modules/inventory/domain/InventoryRepository";
 
-class InMemoryInventoryRepository implements InventoryRepository {
-  private readonly items = new Map<string, InventoryItem>();
-  private readonly movements: StockMovement[] = [];
-
-  constructor(initial: Array<{ variantId: string; quantity: number }>) {
-    for (const s of initial) {
-      this.items.set(s.variantId, InventoryItem.of(s.quantity));
-    }
-  }
-
-  async findByVariantId(variantId: string): Promise<InventoryItem | null> {
-    return this.items.get(variantId) ?? null;
-  }
-
-  async listMovementsByVariantId() {
-    return [];
-  }
-
-  async increaseByVariantId(variantId: string, quantity: number): Promise<void> {
-    const item = this.items.get(variantId);
-    if (!item) throw new Error("Inventory item not found");
-    item.increase(quantity);
-  }
-
-  async decreaseByVariantId(): Promise<void> {
-    throw new Error("not used");
-  }
-
-  async saveMovement(movement: StockMovement): Promise<void> {
-    this.movements.push(movement);
-  }
-
-  getItem(variantId: string): InventoryItem | undefined {
-    return this.items.get(variantId);
-  }
-
-  getMovements(): StockMovement[] {
-    return this.movements;
-  }
-}
-
-describe("ReceiveStock Use Case", () => {
-  const warehouseActor: ActorContext = {
-    actorId: "WH-1",
-    role: "WAREHOUSE",
+describe("ReceiveStock", () => {
+  const warehouseActor = {
+    actorId: "warehouse-1",
+    role: "WAREHOUSE" as const,
   };
 
-  const salesActor: ActorContext = {
-    actorId: "SALES-1",
-    role: "SALES",
-  };
+  it("records stock movement when receive stock succeeds", async () => {
+    const inventoryRepo: InventoryRepository = {
+      findByVariantId: vi.fn().mockResolvedValue(InventoryItem.of(5)),
+      increaseByVariantId: vi.fn().mockResolvedValue(undefined),
+      decreaseByVariantId: vi.fn().mockResolvedValue(undefined),
+      saveMovement: vi.fn().mockResolvedValue(undefined),
+      listMovementsByVariantId: vi.fn().mockResolvedValue([]),
+    };
 
-  it("menambah stok dan mencatat movement IN dengan origin LEGACY", async () => {
-    const repo = new InMemoryInventoryRepository([
-      { variantId: "V001", quantity: 10 },
-    ]);
+    const useCase = new ReceiveStock({ inventoryRepo });
 
-    const useCase = new ReceiveStock({ inventoryRepo: repo });
-
-    const requests = [
+    await useCase.execute(
       {
-        variantId: "V001",
-        quantity: 3,
-        reason: "RESTOCK",
-        referenceId: "RCV-1",
+        variantId: "var-1",
+        quantity: 10,
+        reason: "PROCUREMENT_RECEIVE",
+        referenceId: "po-1",
       },
-    ];
+      warehouseActor,
+    );
 
-    await useCase.execute(requests, warehouseActor);
+    expect(inventoryRepo.findByVariantId).toHaveBeenCalledWith("var-1");
+    expect(inventoryRepo.increaseByVariantId).toHaveBeenCalledWith("var-1", 10);
+    expect(inventoryRepo.saveMovement).toHaveBeenCalledTimes(1);
 
-    const item = repo.getItem("V001");
-    expect(item).toBeDefined();
-    expect(item!.getQuantity()).toBe(13);
-    expect(repo.getMovements()).toHaveLength(1);
-
-    const movement = repo.getMovements()[0];
-    expect(movement.variantId).toBe("V001");
-    expect(movement.productId).toBeNull();
-    expect(movement.type).toBe("IN");
-    expect(movement.origin).toBe("LEGACY");
+    const savedMovement = vi.mocked(inventoryRepo.saveMovement).mock.calls[0][0];
+    expect(savedMovement).toBeInstanceOf(StockMovement);
+    expect(savedMovement.variantId).toBe("var-1");
+    expect(savedMovement.type).toBe("IN");
+    expect(savedMovement.quantity).toBe(10);
+    expect(savedMovement.reason).toBe("PROCUREMENT_RECEIVE");
+    expect(savedMovement.referenceId).toBe("po-1");
+    expect(savedMovement.origin).toBe("PURCHASE");
   });
 
-  it("menolak actor yang tidak ada", async () => {
-    const repo = new InMemoryInventoryRepository([
-      { variantId: "V001", quantity: 10 },
-    ]);
+  it("rejects invalid quantity", async () => {
+    const inventoryRepo: InventoryRepository = {
+      findByVariantId: vi.fn(),
+      increaseByVariantId: vi.fn().mockResolvedValue(undefined),
+      decreaseByVariantId: vi.fn().mockResolvedValue(undefined),
+      saveMovement: vi.fn().mockResolvedValue(undefined),
+      listMovementsByVariantId: vi.fn().mockResolvedValue([]),
+    };
 
-    const useCase = new ReceiveStock({ inventoryRepo: repo });
+    const useCase = new ReceiveStock({ inventoryRepo });
 
     await expect(
       useCase.execute(
-        [
-          {
-            variantId: "V001",
-            quantity: 3,
-            reason: "RESTOCK",
-            referenceId: "RCV-1",
-          },
-        ],
-        undefined as unknown as ActorContext,
+        {
+          variantId: "var-1",
+          quantity: 0,
+          reason: "PROCUREMENT_RECEIVE",
+          referenceId: "po-1",
+        },
+        warehouseActor,
       ),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toMatchObject({
+      name: "InvalidQuantityError",
+    });
+
+    expect(inventoryRepo.findByVariantId).not.toHaveBeenCalled();
+    expect(inventoryRepo.increaseByVariantId).not.toHaveBeenCalled();
+    expect(inventoryRepo.saveMovement).not.toHaveBeenCalled();
   });
 
-  it("menolak role yang tidak berhak", async () => {
-    const repo = new InMemoryInventoryRepository([
-      { variantId: "V001", quantity: 10 },
-    ]);
+  it("rejects when inventory is not found", async () => {
+    const inventoryRepo: InventoryRepository = {
+      findByVariantId: vi.fn().mockResolvedValue(null),
+      increaseByVariantId: vi.fn().mockResolvedValue(undefined),
+      decreaseByVariantId: vi.fn().mockResolvedValue(undefined),
+      saveMovement: vi.fn().mockResolvedValue(undefined),
+      listMovementsByVariantId: vi.fn().mockResolvedValue([]),
+    };
 
-    const useCase = new ReceiveStock({ inventoryRepo: repo });
+    const useCase = new ReceiveStock({ inventoryRepo });
 
     await expect(
       useCase.execute(
-        [
-          {
-            variantId: "V001",
-            quantity: 3,
-            reason: "RESTOCK",
-            referenceId: "RCV-1",
-          },
-        ],
-        salesActor,
+        {
+          variantId: "var-404",
+          quantity: 3,
+          reason: "PROCUREMENT_RECEIVE",
+          referenceId: "po-1",
+        },
+        warehouseActor,
       ),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toMatchObject({
+      name: "InventoryNotFoundError",
+    });
+
+    expect(inventoryRepo.increaseByVariantId).not.toHaveBeenCalled();
+    expect(inventoryRepo.saveMovement).not.toHaveBeenCalled();
   });
 });

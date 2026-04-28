@@ -17,55 +17,59 @@ export class PrismaPurchaseOrderRepository implements PurchaseOrderRepository {
     return randomUUID();
   }
 
-  async save(order: PurchaseOrder): Promise<void> {
-    const data = PrismaPurchaseOrderMapper.toPersistence(order);
+  async save(purchaseOrder: PurchaseOrder): Promise<void> {
+    const data = PrismaPurchaseOrderMapper.toPersistence(purchaseOrder);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.purchaseOrder.upsert({
-        where: { id: data.id },
-        create: {
-          id: data.id,
-          supplierId: data.supplierId,
-          status: data.status,
-          createdAt: data.createdAt,
-          createdBy: data.createdBy,
-          receivedAt: data.receivedAt,
-          receivedBy: data.receivedBy,
-          canceledAt: data.canceledAt,
-          canceledBy: data.canceledBy,
-        },
-        update: {
-          supplierId: data.supplierId,
-          status: data.status,
-          receivedAt: data.receivedAt,
-          receivedBy: data.receivedBy,
-          canceledAt: data.canceledAt,
-          canceledBy: data.canceledBy,
-        },
-      });
-
-      await tx.purchaseItem.deleteMany({
+      const existing = await tx.purchaseOrder.findUnique({
         where: {
-          purchaseOrderId: data.id,
+          id: data.id,
         },
       });
 
-      if (data.items.length > 0) {
-        await tx.purchaseItem.createMany({
-          data: data.items.map((item) => ({
-            id: item.id,
-            purchaseOrderId: item.purchaseOrderId,
-            productId: item.productId,
-            variantId: item.variantId,
-            productNameSnapshot: item.productNameSnapshot,
-            variantNameSnapshot: item.variantNameSnapshot,
-            unitSnapshot: item.unitSnapshot,
-            quantity: item.quantity,
-            unitCost: item.unitCost,
-            subtotalCost: item.subtotalCost,
-          })),
+      if (!existing) {
+        await tx.purchaseOrder.create({
+          data: {
+            id: data.id,
+            supplierId: data.supplierId,
+            status: data.status,
+            createdAt: data.createdAt,
+            createdBy: data.createdBy,
+            receivedAt: data.receivedAt,
+            receivedBy: data.receivedBy,
+            canceledAt: data.canceledAt,
+            canceledBy: data.canceledBy,
+            items: {
+              create: data.items.map((item) => ({
+                id: item.id,
+                productId: item.productId,
+                variantId: item.variantId,
+                productNameSnapshot: item.productNameSnapshot,
+                variantNameSnapshot: item.variantNameSnapshot,
+                unitSnapshot: item.unitSnapshot,
+                quantity: item.quantity,
+                unitCost: item.unitCost,
+                subtotalCost: item.subtotalCost,
+              })),
+            },
+          },
         });
+
+        return;
       }
+
+      await tx.purchaseOrder.update({
+        where: {
+          id: data.id,
+        },
+        data: {
+          status: data.status,
+          receivedAt: data.receivedAt,
+          receivedBy: data.receivedBy,
+          canceledAt: data.canceledAt,
+          canceledBy: data.canceledBy,
+        },
+      });
     });
   }
 

@@ -32,7 +32,7 @@ export class CancelOrder {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: CancelOrderInput): Promise<CancelOrderResult> {
-    const actor = AuthorizationGuard.assertAuthorized(input.actor, ["ADMIN"]);
+    const actor = AuthorizationGuard.assertAuthorized(input.actor, ["ADMIN", "SALES"]);
 
     const useCaseName = "CancelOrder";
     const orderId = EntityId.of(input.orderId);

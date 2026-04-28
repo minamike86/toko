@@ -2,13 +2,19 @@ import { PurchaseOrderRepository } from "@/modules/procurement/domain/PurchaseOr
 import { PurchaseOrder } from "@/modules/procurement/domain/PurchaseOrder";
 import { PurchaseOrderDto } from "../dto/PurchaseOrderDto";
 import { ReceivePurchaseOrderInput } from "../dto/ReceivePurchaseOrderInput";
-import { InventoryProcurementPort } from "../ports/InventoryProcurementPort";
+import {
+  InventoryProcurementPort,
+  ReceiveProcurementStockInput,
+  ReceiveProcurementStockItem,
+} from "../ports/InventoryProcurementPort";
 import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
-import { ActorContext } from "@/shared/system/types/actor-context";
 import { NotFoundError } from "@/shared/errors/ApplicationError";
 import { UserRole } from "@/modules/user/domain/UserRole";
-
-
+import type {
+  NormalizeProcurementItemInput,
+  NormalizeProcurementItemResult,
+} from "@/shared/application/unit-normalization/procurement-unit-normalization.types";
+import type { ProcurementUnitNormalizationPort } from "@/shared/application/unit-normalization/procurement-unit-normalization.port";
 
 function toDto(order: PurchaseOrder): PurchaseOrderDto {
   return {
@@ -22,6 +28,7 @@ function toDto(order: PurchaseOrder): PurchaseOrderDto {
     canceledAt: order.canceledAt,
     canceledBy: order.canceledBy,
     totalQuantity: order.totalQuantity,
+    totalTransactionQuantity: order.totalQuantity,
     totalCost: order.totalCost,
     items: order.items.map((item) => ({
       id: item.id,
@@ -38,17 +45,46 @@ function toDto(order: PurchaseOrder): PurchaseOrderDto {
   };
 }
 
+function toNormalizationInput(
+  purchaseOrderId: string,
+  item: PurchaseOrder["items"][number],
+): NormalizeProcurementItemInput {
+  return {
+    variantId: item.variantId,
+    transactionUnit: item.unitSnapshot,
+    transactionQuantity: item.quantity,
+    referenceId: purchaseOrderId,
+  };
+}
+
+function toReceiveProcurementStockItem(
+  item: NormalizeProcurementItemResult,
+): ReceiveProcurementStockItem {
+  return {
+    variantId: item.variantId,
+    quantity: item.canonicalQuantity,
+    reason: "PROCUREMENT_RECEIVE",
+    referenceId: item.referenceId,
+  };
+}
+
+function toReceiveProcurementStockInput(
+  items: ReadonlyArray<NormalizeProcurementItemResult>,
+): ReceiveProcurementStockInput {
+  return {
+    items: items.map(toReceiveProcurementStockItem),
+  };
+}
+
 export class ReceivePurchaseOrder {
   constructor(
     private readonly purchaseOrderRepository: PurchaseOrderRepository,
+    private readonly normalizationPort: ProcurementUnitNormalizationPort,
     private readonly inventoryProcurementPort: InventoryProcurementPort,
   ) { }
 
-  async execute(
-    input: ReceivePurchaseOrderInput,
-    actorParam: ActorContext,
-  ): Promise<PurchaseOrderDto> {
-    const actor = AuthorizationGuard.assertAuthorized(actorParam, [
+  async execute(input: ReceivePurchaseOrderInput): Promise<PurchaseOrderDto> {
+    const actor = AuthorizationGuard.assertAuthorized(input.actor, [
       UserRole.ADMIN,
       UserRole.WAREHOUSE,
     ]);
@@ -63,17 +99,18 @@ export class ReceivePurchaseOrder {
 
     order.assertCanBeReceived();
 
-    // CRITICAL CONTRACT:
-    // inventory dieksekusi dulu
-    // flow non-atomic
-    // bila inventory sukses tapi save gagal, stok tetap bertambah
-    await this.inventoryProcurementPort.receivePurchaseStock(
-      order.items.map((item) => ({
-        variantId: item.variantId,
-        quantity: item.quantity,
-        reason: "PURCHASE_RECEIVE",
-        referenceId: order.id,
-      })),
+    const normalizedItems: NormalizeProcurementItemResult[] = [];
+
+    for (const item of order.items) {
+      const normalizedItem = await this.normalizationPort.normalizeProcurementItem(
+        toNormalizationInput(order.id, item),
+      );
+
+      normalizedItems.push(normalizedItem);
+    }
+
+    await this.inventoryProcurementPort.receiveProcurementStock(
+      toReceiveProcurementStockInput(normalizedItems),
     );
 
     order.receive({

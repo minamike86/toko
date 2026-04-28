@@ -246,6 +246,13 @@ export default function PosPage() {
 
       const response = await fetch(`/api/orders/${orderId}/cancel`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          actorId: ACTOR_ID,
+          role: ACTOR_ROLE,
+        }),
       });
 
       const data = (await response.json()) as
@@ -281,6 +288,13 @@ export default function PosPage() {
 
       const response = await fetch(`/api/orders/${orderId}/pay-credit`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          actorId: ACTOR_ID,
+          role: ACTOR_ROLE,
+        }),
       });
 
       const data = (await response.json()) as

@@ -1,13 +1,10 @@
-import {
-  findInventorySnapshot,
-  type InventorySnapshotRow,
-} from "@/modules/reporting/queries/inventory-snapshot.query";
 import type { InventorySnapshotReportRow } from "@/modules/reporting/dto/inventory-snapshot-report.dto";
+import { findInventorySnapshot } from "@/modules/reporting/queries/inventory-snapshot.query";
 
 export async function getInventorySnapshotReport(): Promise<
   InventorySnapshotReportRow[]
 > {
-  const rows: InventorySnapshotRow[] = await findInventorySnapshot();
+  const rows = await findInventorySnapshot();
 
   return rows.map((row) => ({
     variantId: row.variantId,

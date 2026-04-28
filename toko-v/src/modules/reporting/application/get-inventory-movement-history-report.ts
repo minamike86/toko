@@ -7,5 +7,17 @@ export async function getInventoryMovementHistoryReport(filter?: {
   from?: Date;
   to?: Date;
 }): Promise<InventoryMovementHistoryDTO[]> {
-  return findInventoryMovementHistory(filter);
+  const rows = await findInventoryMovementHistory(filter);
+
+  return rows.map((row) => ({
+    id: row.id,
+    productId: row.productId,
+    variantId: row.variantId,
+    movementDate: row.occurredAt,
+    movementType: row.type,
+    origin: row.origin,
+    quantity: row.quantity,
+    reason: row.reason,
+    referenceId: row.referenceId,
+  }));
 }

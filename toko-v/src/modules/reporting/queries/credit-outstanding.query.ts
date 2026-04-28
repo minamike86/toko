@@ -1,4 +1,3 @@
-// src/modules/reporting/queries/credit-outstanding.query.ts
 import { prisma } from "@/shared/prisma";
 
 export type CreditOutstandingRow = {
@@ -13,19 +12,20 @@ export async function findCreditOutstanding(params: {
   from: Date;
   to: Date;
 }): Promise<CreditOutstandingRow[]> {
-  const { from, to } = params;
-
   const orders = await prisma.order.findMany({
     where: {
-      status: "ON_CREDIT",
+      createdAt: {
+        gte: params.from,
+        lte: params.to,
+      },
       outstandingAmount: {
         gt: 0,
       },
-      createdAt: {
-        gte: from,
-        lte: to,
+      status: {
+        in: ["ON_CREDIT", "PAID"],
       },
     },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
       createdAt: true,
@@ -33,16 +33,13 @@ export async function findCreditOutstanding(params: {
       totalAmount: true,
       outstandingAmount: true,
     },
-    orderBy: {
-      createdAt: "asc",
-    },
   });
 
-  return orders.map((o) => ({
-    orderId: o.id,
-    orderDate: o.createdAt,
-    orderType: o.type,
-    totalAmount: o.totalAmount,
-    outstandingAmount: o.outstandingAmount,
+  return orders.map((order) => ({
+    orderId: order.id,
+    orderDate: order.createdAt,
+    orderType: order.type,
+    totalAmount: order.totalAmount,
+    outstandingAmount: order.outstandingAmount,
   }));
 }

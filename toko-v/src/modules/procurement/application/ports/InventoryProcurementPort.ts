@@ -1,12 +1,16 @@
-export type ReceiveProcurementStockRequest = {
+export type ProcurementInventoryMutationReason = "PROCUREMENT_RECEIVE";
+
+export type ReceiveProcurementStockItem = {
   variantId: string;
   quantity: number;
-  reason: string;
+  reason: ProcurementInventoryMutationReason;
   referenceId: string;
 };
 
+export type ReceiveProcurementStockInput = {
+  items: ReceiveProcurementStockItem[];
+};
+
 export interface InventoryProcurementPort {
-  receivePurchaseStock(
-    requests: ReceiveProcurementStockRequest[],
-  ): Promise<void>;
+  receiveProcurementStock(input: ReceiveProcurementStockInput): Promise<void>;
 }

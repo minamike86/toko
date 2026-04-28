@@ -22,6 +22,7 @@ export type PurchaseOrderDto = {
   canceledAt: Date | null;
   canceledBy: string | null;
   totalQuantity: number;
+  totalTransactionQuantity: number;
   totalCost: number;
   items: PurchaseOrderItemDto[];
 };

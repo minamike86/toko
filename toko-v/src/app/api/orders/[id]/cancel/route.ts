@@ -1,42 +1,34 @@
 import { NextResponse } from "next/server";
 import { cancelOrder } from "@/wiring/container";
+import { parseActorContext } from "@/shared/delivery/parse-actor-context";
+import { mapHttpError } from "@/shared/delivery/map-http-error";
 
-type ErrorResponse = {
-  error: string;
-  message: string;
+type CancelOrderRequestBody = {
+  actorId: string;
+  role: string;
 };
 
 export async function POST(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
 
   try {
+    const body = (await req.json()) as CancelOrderRequestBody;
+    const actor = parseActorContext({
+      actorId: body.actorId,
+      role: body.role,
+    });
+
     const result = await cancelOrder.execute({
       orderId: id,
-      actor: {
-        actorId: "POS-OPERATOR-001",
-        role: "ADMIN",
-      },
+      actor,
     });
 
     return NextResponse.json(result, { status: 200 });
   } catch (error: unknown) {
-    return NextResponse.json(mapErrorToResponse(error), { status: 400 });
+    const mapped = mapHttpError(error);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
-}
-
-function mapErrorToResponse(error: unknown): ErrorResponse {
-  if (error instanceof Error) {
-    return {
-      error: error.name,
-      message: error.message,
-    };
-  }
-
-  return {
-    error: "UnknownError",
-    message: "Terjadi kesalahan yang tidak terduga.",
-  };
 }

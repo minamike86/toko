@@ -1,51 +1,58 @@
 import { prisma } from "@/shared/prisma";
+import type { InventoryLowStockDTO } from "../dto/inventory-low-stock.dto";
 
-export type InventoryLowStockRow = {
-  productId: string;
-  variantId: string;
-  quantity: number;
-};
+function buildVariantName(input: {
+  sizeLabel: string | null;
+  colorLabel: string | null;
+}): string {
+  const parts = [input.sizeLabel, input.colorLabel].filter(
+    (value): value is string => value !== null && value.trim().length > 0,
+  );
 
-type FindInventoryLowStockInput =
-  | number
-  | {
-    threshold: number;
-  };
+  return parts.length > 0 ? parts.join(" / ") : "Default";
+}
 
 export async function findInventoryLowStock(
-  input: FindInventoryLowStockInput,
-): Promise<InventoryLowStockRow[]> {
-  const threshold = typeof input === "number" ? input : input.threshold;
-
+  threshold: number,
+): Promise<InventoryLowStockDTO[]> {
   const rows = await prisma.inventoryItem.findMany({
     where: {
       quantity: {
         lte: threshold,
       },
     },
-    orderBy: [{ quantity: "asc" }, { variantId: "asc" }],
     select: {
       variantId: true,
       quantity: true,
       variant: {
         select: {
+          id: true,
           productId: true,
+          sku: true,
+          unit: true,
+          sizeLabel: true,
+          colorLabel: true,
+          product: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
     },
+    orderBy: [{ quantity: "asc" }, { variantId: "asc" }],
   });
 
-  return rows.map((row) => {
-    if (!row.variant) {
-      throw new Error(
-        `Inventory low stock query found inventory item without related variant: ${row.variantId}`,
-      );
-    }
-
-    return {
-      productId: row.variant.productId,
-      variantId: row.variantId,
-      quantity: row.quantity,
-    };
-  });
+  return rows.map((row) => ({
+    productId: row.variant.productId,
+    variantId: row.variantId,
+    sku: row.variant.sku,
+    productName: row.variant.product.name,
+    variantName: buildVariantName({
+      sizeLabel: row.variant.sizeLabel,
+      colorLabel: row.variant.colorLabel,
+    }),
+    unit: row.variant.unit,
+    currentStockQuantity: row.quantity,
+  }));
 }

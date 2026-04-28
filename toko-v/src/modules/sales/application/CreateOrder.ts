@@ -1,6 +1,7 @@
 import { EntityId } from "@/shared/value-objects/EntityId";
 import { Money } from "@/shared/value-objects/Money";
 import { PositiveInt } from "@/shared/value-objects/PositiveInt";
+import { NotFoundError } from "@/shared/errors/ApplicationError";
 import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
 import { ActorContext } from "@/shared/system/types/actor-context";
 
@@ -17,14 +18,6 @@ import {
 } from "@/modules/inventory/application/InventoryService";
 
 import { InactiveProductError } from "../domain/SalesErrors";
-
-export class NotFoundError extends Error {
-  readonly name = "NotFoundError";
-
-  constructor(public readonly entity: string, public readonly id: string) {
-    super(`${entity} not found: ${id}`);
-  }
-}
 
 export type CreateOrderInput = {
   orderId: string;
@@ -54,25 +47,39 @@ export class CreateOrder {
   constructor(private readonly deps: Deps) { }
 
   async execute(input: CreateOrderInput): Promise<CreateOrderResult> {
+    console.info("[CreateOrder] input:", input);
+
     const actor = AuthorizationGuard.assertAuthorized(input.actor, [
       "ADMIN",
       "SALES",
     ]);
 
     const variants = await this.deps.catalogReadRepo.getVariantsByIds(
-      input.items.map((i) => i.variantId),
+      input.items.map((item) => item.variantId),
     );
 
-    const variantMap = new Map(variants.map((v) => [v.variantId, v]));
+    console.info("[CreateOrder] variants found:", variants);
+
+    const variantMap = new Map(variants.map((variant) => [variant.variantId, variant]));
 
     const orderItems = input.items.map((line) => {
       const variant = variantMap.get(line.variantId);
 
       if (!variant) {
+        console.error("[CreateOrder] variant not found:", {
+          requestedVariantId: line.variantId,
+          availableVariantIds: variants.map((item) => item.variantId),
+        });
+
         throw new NotFoundError("ProductVariant", line.variantId);
       }
 
       if (!variant.isActive) {
+        console.error("[CreateOrder] inactive variant:", {
+          variantId: variant.variantId,
+          productId: variant.productId,
+        });
+
         throw new InactiveProductError(variant.productId);
       }
 
@@ -105,8 +112,26 @@ export class CreateOrder {
         referenceId: order.id.toString(),
       }));
 
+      console.info("[CreateOrder] issueStock requests:", requests);
+
       await this.deps.inventoryService.issueStock(requests);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("[CreateOrder] issueStock failed:", error);
+      console.error(
+        "[CreateOrder] issueStock meta:",
+        error instanceof Error
+          ? {
+            name: error.name,
+            message: error.message,
+            constructorName: error.constructor.name,
+            stack: error.stack,
+          }
+          : {
+            type: typeof error,
+            value: error,
+          },
+      );
+
       order.markAsFailed();
       await this.deps.orderRepo.save(order);
       throw error;

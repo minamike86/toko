@@ -1,19 +1,27 @@
 import { NextResponse } from "next/server";
 import { payCredit } from "@/wiring/container";
 import { getOrderOutstanding } from "@/modules/reporting/application/get-order-outstanding";
+import { parseActorContext } from "@/shared/delivery/parse-actor-context";
+import { mapHttpError } from "@/shared/delivery/map-http-error";
 
-type ErrorResponse = {
-  error: string;
-  message: string;
+type PayCreditRequestBody = {
+  actorId: string;
+  role: string;
 };
 
 export async function POST(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
 
   try {
+    const body = (await req.json()) as PayCreditRequestBody;
+    const actor = parseActorContext({
+      actorId: body.actorId,
+      role: body.role,
+    });
+
     const outstanding = await getOrderOutstanding(id);
 
     if (!outstanding) {
@@ -31,29 +39,12 @@ export async function POST(
       amount: outstanding.outstandingAmount,
       paidAt: new Date(),
       method: "CASH",
-      actor: {
-        actorId: "POS-OPERATOR-001",
-        role: "ADMIN",
-      },
+      actor,
     });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: unknown) {
-    const response = mapErrorToResponse(error);
-    return NextResponse.json(response, { status: 400 });
+    const mapped = mapHttpError(error);
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
-}
-
-function mapErrorToResponse(error: unknown): ErrorResponse {
-  if (error instanceof Error) {
-    return {
-      error: error.name,
-      message: error.message,
-    };
-  }
-
-  return {
-    error: "UnknownError",
-    message: "Terjadi kesalahan yang tidak terduga.",
-  };
 }

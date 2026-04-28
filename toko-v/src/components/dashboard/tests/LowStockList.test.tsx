@@ -14,7 +14,6 @@ describe("LowStockList", () => {
             variantName: "Default",
             unit: "PCS",
             currentStockQuantity: 5,
-            lowStockThreshold: 10,
             isLowStock: true,
           },
           {
@@ -24,7 +23,6 @@ describe("LowStockList", () => {
             variantName: "Besar",
             unit: "PCS",
             currentStockQuantity: 20,
-            lowStockThreshold: 10,
             isLowStock: false,
           },
         ]}
@@ -57,7 +55,6 @@ describe("LowStockList", () => {
             variantName: "Default",
             unit: "PCS",
             currentStockQuantity: 20,
-            lowStockThreshold: 10,
             isLowStock: false,
           },
         ]}

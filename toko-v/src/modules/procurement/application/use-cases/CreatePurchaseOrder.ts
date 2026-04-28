@@ -115,6 +115,7 @@ export class CreatePurchaseOrder {
       canceledAt: order.canceledAt,
       canceledBy: order.canceledBy,
       totalQuantity: order.totalQuantity,
+      totalTransactionQuantity: order.totalQuantity, // ✅ TAMBAH INI
       totalCost: order.totalCost,
       items: order.items.map((item) => ({
         id: item.id,

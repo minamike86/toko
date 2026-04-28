@@ -10,6 +10,10 @@ describe("PrismaPurchaseOrderRepository integration", () => {
   const repository = new PrismaPurchaseOrderRepository();
 
   beforeEach(async () => {
+    await prisma.purchaseReturnReductionItem.deleteMany();
+    await prisma.purchaseReturnReduction.deleteMany();
+    await prisma.supplierPayment.deleteMany();
+
     await prisma.purchaseItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.supplier.deleteMany();

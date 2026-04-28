@@ -49,6 +49,9 @@ describe("getWarehouseDashboard", () => {
       {
         productId: "P001",
         variantId: "V001",
+        sku: "SKU-001",
+        productName: "Produk A",
+        variantName: "Merah",
         unit: "PCS",
         currentStockQuantity: 4,
       },
@@ -66,7 +69,6 @@ describe("getWarehouseDashboard", () => {
         variantName: "Merah",
         unit: "PCS",
         currentStockQuantity: 4,
-        lowStockThreshold: 10,
         isLowStock: true,
       },
       {
@@ -76,7 +78,6 @@ describe("getWarehouseDashboard", () => {
         variantName: "Biru",
         unit: "PCS",
         currentStockQuantity: 20,
-        lowStockThreshold: 10,
         isLowStock: false,
       },
     ]);

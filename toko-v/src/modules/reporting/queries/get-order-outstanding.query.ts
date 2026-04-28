@@ -2,26 +2,37 @@ import { prisma } from "@/shared/prisma";
 
 export type OrderOutstandingRow = {
   orderId: string;
+  createdAt: Date;
+  orderType: string;
+  totalAmount: number;
   outstandingAmount: number;
 };
 
-export async function findOrderOutstanding(
+export async function findOrderOutstandingById(
   orderId: string,
 ): Promise<OrderOutstandingRow | null> {
-  const row = await prisma.order.findUnique({
-    where: { id: orderId },
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
     select: {
       id: true,
+      createdAt: true,
+      type: true,
+      totalAmount: true,
       outstandingAmount: true,
     },
   });
 
-  if (!row) {
+  if (!order) {
     return null;
   }
 
   return {
-    orderId: row.id,
-    outstandingAmount: row.outstandingAmount,
+    orderId: order.id,
+    createdAt: order.createdAt,
+    orderType: order.type,
+    totalAmount: order.totalAmount,
+    outstandingAmount: order.outstandingAmount,
   };
 }

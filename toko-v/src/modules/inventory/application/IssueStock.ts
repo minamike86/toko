@@ -1,6 +1,7 @@
 import { InventoryRepository } from "../domain/InventoryRepository";
 import { StockMovement } from "../domain/StockMovement";
-import { InsufficientStockError, IssueStockRequest } from "./InventoryService";
+import { InsufficientStockError } from "../domain/InventoryErrors";
+import { IssueStockRequest } from "./InventoryService";
 
 type Deps = {
   inventoryRepo: InventoryRepository;

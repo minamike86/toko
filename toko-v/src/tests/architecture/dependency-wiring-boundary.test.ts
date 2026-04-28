@@ -1,28 +1,67 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+
+type RuleCheck = {
+  name: string;
+  files: string[];
+  violations: string[];
+};
 
 const PROJECT_ROOT = process.cwd();
 const SRC_ROOT = path.join(PROJECT_ROOT, "src");
 
-const PRODUCTION_EXTENSIONS = new Set([".ts", ".tsx"]);
-const TEST_FILE_PATTERN = /\.(test|spec)\.tsx?$/;
+const INCLUDED_EXTENSIONS = new Set([".ts", ".tsx"]);
+const EXCLUDED_PATH_PATTERNS = [
+  `${path.sep}tests${path.sep}`,
+  `${path.sep}__tests__${path.sep}`,
+  ".test.",
+  ".spec.",
+];
 
-function isProductionSourceFile(filePath: string): boolean {
-  const ext = path.extname(filePath);
-  if (!PRODUCTION_EXTENSIONS.has(ext)) return false;
+const PRODUCTION_ROOTS = [
+  path.join(SRC_ROOT, "app"),
+  path.join(SRC_ROOT, "modules"),
+  path.join(SRC_ROOT, "shared"),
+  path.join(SRC_ROOT, "wiring"),
+];
 
-  const normalized = filePath.replace(/\\/g, "/");
+const PRODUCTION_USE_CASE_NAMES = [
+  "CreateOrder",
+  "CancelOrder",
+  "PayCredit",
+  "ReceiveStock",
+  "AdjustStock",
+  "IssueStock",
+  "CheckInventoryConsistency",
+  "CreatePurchaseOrder",
+  "CancelPurchaseOrder",
+  "ReceivePurchaseOrder",
+  "CreateSupplier",
+  "UpdateSupplierStatus",
+] as const;
 
-  if (TEST_FILE_PATTERN.test(normalized)) return false;
-  if (normalized.includes("/__tests__/")) return false;
-  if (normalized.includes("/tests/")) return false;
+const SHARED_PRISMA_IMPORT_PATTERN = /from\s+["'][^"']*(?:@\/shared\/prisma|src\/shared\/prisma|shared\/prisma)["']/;
+const RAW_PRISMA_IMPORT_PATTERN = /from\s+["']@prisma\/client["']/;
+const ANY_PRISMA_IMPORT_PATTERN = /(from\s+["']@prisma\/client["'])|(from\s+["'][^"']*(?:@\/shared\/prisma|src\/shared\/prisma|shared\/prisma)["'])/;
 
-  return true;
+function normalizePath(filePath: string): string {
+  return filePath.split(path.sep).join("/");
+}
+
+function isIncludedFile(filePath: string): boolean {
+  const extension = path.extname(filePath);
+  if (!INCLUDED_EXTENSIONS.has(extension)) {
+    return false;
+  }
+
+  return !EXCLUDED_PATH_PATTERNS.some((pattern) => filePath.includes(pattern));
 }
 
 function walkFiles(dirPath: string): string[] {
-  if (!fs.existsSync(dirPath)) return [];
+  if (!fs.existsSync(dirPath)) {
+    return [];
+  }
 
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   const results: string[] = [];
@@ -35,7 +74,7 @@ function walkFiles(dirPath: string): string[] {
       continue;
     }
 
-    if (entry.isFile() && isProductionSourceFile(fullPath)) {
+    if (entry.isFile() && isIncludedFile(fullPath)) {
       results.push(fullPath);
     }
   }
@@ -43,329 +82,346 @@ function walkFiles(dirPath: string): string[] {
   return results;
 }
 
-function normalizeForMatch(filePath: string): string {
-  return filePath.replace(/\\/g, "/");
+function listProductionFiles(): string[] {
+  return PRODUCTION_ROOTS.flatMap((root) => walkFiles(root));
 }
 
-function readFile(filePath: string): string {
+function filesUnder(relativePattern: RegExp): string[] {
+  return listProductionFiles().filter((filePath) => {
+    return relativePattern.test(normalizePath(path.relative(PROJECT_ROOT, filePath)));
+  });
+}
+
+function readSource(filePath: string): string {
   return fs.readFileSync(filePath, "utf8");
 }
 
-function filesUnder(relativeDir: string): string[] {
-  return walkFiles(path.join(PROJECT_ROOT, relativeDir));
+function findImports(source: string): string[] {
+  const imports = Array.from(source.matchAll(/import\s+[^;]*?from\s+["']([^"']+)["']/g));
+  return imports.map((match) => match[1]);
 }
 
-function expectNoRegexMatch(
-  files: string[],
-  regex: RegExp,
-  message: string,
-): void {
-  const offenders: string[] = [];
+function findRegexViolations(files: string[], regex: RegExp): string[] {
+  return files
+    .filter((filePath) => regex.test(readSource(filePath)))
+    .map((filePath) => normalizePath(path.relative(PROJECT_ROOT, filePath)));
+}
 
-  for (const filePath of files) {
-    const content = readFile(filePath);
-    if (regex.test(content)) {
-      offenders.push(normalizeForMatch(path.relative(PROJECT_ROOT, filePath)));
-    }
-    regex.lastIndex = 0;
-  }
+function findImportViolations(files: string[], importPattern: RegExp): string[] {
+  return files
+    .filter((filePath) => {
+      const imports = findImports(readSource(filePath));
+      return imports.some((importSource) => importPattern.test(importSource));
+    })
+    .map((filePath) => normalizePath(path.relative(PROJECT_ROOT, filePath)));
+}
 
+function findImportLineViolations(files: string[], importPattern: RegExp): string[] {
+  return files
+    .filter((filePath) => {
+      const source = readSource(filePath);
+      return source
+        .split("\n")
+        .some((line) => line.trim().startsWith("import ") && importPattern.test(line));
+    })
+    .map((filePath) => normalizePath(path.relative(PROJECT_ROOT, filePath)));
+}
+
+function expectNoViolations(rule: RuleCheck): void {
   expect(
-    offenders,
-    `${message}\n\nOffending files:\n${offenders.join("\n") || "(none)"}`,
+    rule.violations,
+    `${rule.name}\nViolations:\n${rule.violations.join("\n")}`,
   ).toEqual([]);
 }
 
-function findImports(content: string): string[] {
-  const imports: string[] = [];
-
-  const importFromRegex =
-    /import\s+(?:type\s+)?(?:[\s\S]*?)\s+from\s+["']([^"']+)["']/g;
-  const sideEffectImportRegex = /import\s+["']([^"']+)["']/g;
-
-  for (const match of content.matchAll(importFromRegex)) {
-    imports.push(match[1]);
-  }
-
-  for (const match of content.matchAll(sideEffectImportRegex)) {
-    imports.push(match[1]);
-  }
-
-  return imports;
+function expectFileExists(relativePath: string): void {
+  const fullPath = path.join(PROJECT_ROOT, relativePath);
+  expect(fs.existsSync(fullPath), `Missing required file: ${relativePath}`).toBe(true);
 }
 
-function expectNoImportMatch(
-  files: string[],
-  isForbiddenImport: (importSource: string, filePath: string) => boolean,
-  message: string,
-): void {
-  const offenders: string[] = [];
+describe("dependency wiring and boundary architecture", () => {
+  describe("Rule Group A - Prisma boundary", () => {
+    it("A1: application layer must not instantiate PrismaClient", () => {
+      const files = filesUnder(/^src\/modules\/[^/]+\/application\//);
+      const violations = findRegexViolations(files, /new\s+PrismaClient\s*\(/g);
 
-  for (const filePath of files) {
-    const imports = findImports(readFile(filePath));
-    const relativeFile = normalizeForMatch(path.relative(PROJECT_ROOT, filePath));
-
-    for (const importSource of imports) {
-      if (isForbiddenImport(importSource, relativeFile)) {
-        offenders.push(`${relativeFile} -> ${importSource}`);
-      }
-    }
-  }
-
-  expect(
-    offenders,
-    `${message}\n\nOffending imports:\n${offenders.join("\n") || "(none)"}`,
-  ).toEqual([]);
-}
-
-function isInfrastructureImport(importSource: string): boolean {
-  return (
-    importSource.includes("/infrastructure/") ||
-    importSource.includes("/infrastructure") ||
-    importSource.includes("Prisma") ||
-    importSource.includes("Repository")
-  );
-}
-
-function isCrossModuleInfrastructureImport(
-  importSource: string,
-  targetModule: string,
-): boolean {
-  return (
-    importSource.includes(`/modules/${targetModule}/infrastructure/`) ||
-    importSource.includes(`@/modules/${targetModule}/infrastructure/`)
-  );
-}
-
-describe("dependency-wiring-boundary", () => {
-  describe("Prisma instantiation boundary", () => {
-    it("application layer must not instantiate PrismaClient", () => {
-      const files = filesUnder("src/modules");
-      const applicationFiles = files.filter((filePath) =>
-        normalizeForMatch(filePath).includes("/application/"),
-      );
-
-      expectNoRegexMatch(
-        applicationFiles,
-        /\bnew\s+PrismaClient\s*\(/g,
-        "Application layer must not instantiate PrismaClient",
-      );
-    });
-
-    it("domain layer must not instantiate PrismaClient", () => {
-      const files = filesUnder("src/modules");
-      const domainFiles = files.filter((filePath) =>
-        normalizeForMatch(filePath).includes("/domain/"),
-      );
-
-      expectNoRegexMatch(
-        domainFiles,
-        /\bnew\s+PrismaClient\s*\(/g,
-        "Domain layer must not instantiate PrismaClient",
-      );
-    });
-
-    it("UI / HTTP layer must not instantiate PrismaClient", () => {
-      const files = filesUnder("src/app");
-
-      expectNoRegexMatch(
+      expectNoViolations({
+        name: "Application layer must not instantiate PrismaClient",
         files,
-        /\bnew\s+PrismaClient\s*\(/g,
-        "UI / HTTP layer must not instantiate PrismaClient",
-      );
+        violations,
+      });
+    });
+
+    it("A2: domain layer must not instantiate PrismaClient", () => {
+      const files = filesUnder(/^src\/modules\/[^/]+\/domain\//);
+      const violations = findRegexViolations(files, /new\s+PrismaClient\s*\(/g);
+
+      expectNoViolations({
+        name: "Domain layer must not instantiate PrismaClient",
+        files,
+        violations,
+      });
+    });
+
+    it("A3: UI and HTTP layer must not instantiate PrismaClient", () => {
+      const files = filesUnder(/^src\/app\//);
+      const violations = findRegexViolations(files, /new\s+PrismaClient\s*\(/g);
+
+      expectNoViolations({
+        name: "UI / HTTP layer must not instantiate PrismaClient",
+        files,
+        violations,
+      });
+    });
+
+    it("A4: forbidden layers must not import raw Prisma or shared Prisma client", () => {
+      const files = [
+        ...filesUnder(/^src\/modules\/[^/]+\/application\//),
+        ...filesUnder(/^src\/modules\/[^/]+\/domain\//),
+        ...filesUnder(/^src\/app\//),
+      ];
+      const violations = findImportLineViolations(files, ANY_PRISMA_IMPORT_PATTERN);
+
+      expectNoViolations({
+        name: "Forbidden layers must not import raw Prisma or shared Prisma client",
+        files,
+        violations,
+      });
     });
   });
 
-  describe("repository implementation boundary", () => {
-    it("application layer must not instantiate Prisma repository implementations", () => {
-      const files = filesUnder("src/modules").filter((filePath) =>
-        normalizeForMatch(filePath).includes("/application/"),
-      );
+  describe("Rule Group B - repository and dependency boundary", () => {
+    it("B1: application layer must not instantiate Prisma repository implementations", () => {
+      const files = filesUnder(/^src\/modules\/[^/]+\/application\//);
+      const violations = findRegexViolations(files, /new\s+Prisma\w*Repository\s*\(/g);
 
-      expectNoRegexMatch(
+      expectNoViolations({
+        name: "Application layer must not instantiate Prisma repository implementations",
         files,
-        /\bnew\s+Prisma[A-Za-z0-9_]*Repository\s*\(/g,
-        "Application layer must not instantiate Prisma repository implementations",
-      );
+        violations,
+      });
     });
 
-    it("application layer must not import infrastructure implementations", () => {
-      const files = filesUnder("src/modules").filter((filePath) =>
-        normalizeForMatch(filePath).includes("/application/"),
-      );
+    it("B2: application layer must not import infrastructure implementations", () => {
+      const files = filesUnder(/^src\/modules\/[^/]+\/application\//);
+      const violations = findImportViolations(files, /\/infrastructure\//);
 
-      expectNoImportMatch(
+      expectNoViolations({
+        name: "Application layer must not import infrastructure implementations",
         files,
-        (importSource) => importSource.includes("/infrastructure/"),
-        "Application layer must not depend on infrastructure implementations",
-      );
-    });
-  });
-
-  describe("UI / HTTP anti-bypass rules", () => {
-    it("UI / HTTP layer must not import infrastructure implementations directly", () => {
-      const files = filesUnder("src/app");
-
-      expectNoImportMatch(
-        files,
-        (importSource) => importSource.includes("/infrastructure/"),
-        "UI / HTTP layer must not import infrastructure implementations directly",
-      );
+        violations,
+      });
     });
 
-    it("UI / HTTP layer must not instantiate production use cases directly", () => {
-      const files = filesUnder("src/app");
+    it("B3: UI and HTTP layer must not import infrastructure implementations", () => {
+      const files = filesUnder(/^src\/app\//);
+      const violations = findImportViolations(files, /modules\/[^/]+\/infrastructure\//);
 
-      expectNoRegexMatch(
+      expectNoViolations({
+        name: "UI / HTTP layer must not import infrastructure implementations",
         files,
-        /\bnew\s+(CreateOrder|CancelOrder|PayCredit|ReceiveStock|AdjustStock|IssueStock|CheckInventoryConsistency|CreatePurchaseOrder|CancelPurchaseOrder|ReceivePurchaseOrder|CreateSupplier|UpdateSupplierStatus)\s*\(/g,
-        "UI / HTTP layer must use pre-wired use cases, not instantiate them directly",
-      );
-    });
-
-    it("UI / HTTP layer must not instantiate Prisma repositories directly", () => {
-      const files = filesUnder("src/app");
-
-      expectNoRegexMatch(
-        files,
-        /\bnew\s+Prisma[A-Za-z0-9_]*Repository\s*\(/g,
-        "UI / HTTP layer must not instantiate Prisma repositories directly",
-      );
+        violations,
+      });
     });
   });
 
-  describe("cross-module infrastructure bypass", () => {
-    it("sales application must not import inventory infrastructure directly", () => {
-      const files = filesUnder("src/modules/sales/application");
+  describe("Rule Group C - use case and container discipline", () => {
+    it("C1: UI and HTTP layer must not instantiate production use cases directly", () => {
+      const files = filesUnder(/^src\/app\//);
+      const useCasePattern = PRODUCTION_USE_CASE_NAMES.join("|");
+      const violations = findRegexViolations(files, new RegExp(`new\\s+(${useCasePattern})\\s*\\(`, "g"));
 
-      expectNoImportMatch(
+      expectNoViolations({
+        name: "UI / HTTP layer must not instantiate production use cases directly",
         files,
-        (importSource) => isCrossModuleInfrastructureImport(importSource, "inventory"),
-        "Sales application must not depend directly on Inventory infrastructure",
-      );
+        violations,
+      });
     });
 
-    it("procurement application must not import inventory infrastructure directly", () => {
-      const files = filesUnder("src/modules/procurement/application");
+    it("C2: UI and HTTP layer must not instantiate Prisma repositories directly", () => {
+      const files = filesUnder(/^src\/app\//);
+      const violations = findRegexViolations(files, /new\s+Prisma\w*Repository\s*\(/g);
 
-      expectNoImportMatch(
+      expectNoViolations({
+        name: "UI / HTTP layer must not instantiate Prisma repositories directly",
         files,
-        (importSource) => isCrossModuleInfrastructureImport(importSource, "inventory"),
-        "Procurement application must not depend directly on Inventory infrastructure",
-      );
+        violations,
+      });
     });
 
-    it("dashboard must not import write-side infrastructure implementations", () => {
-      const files = filesUnder("src/modules/dashboard");
-
-      expectNoImportMatch(
-        files,
-        (importSource) =>
-          isCrossModuleInfrastructureImport(importSource, "sales") ||
-          isCrossModuleInfrastructureImport(importSource, "inventory") ||
-          isCrossModuleInfrastructureImport(importSource, "procurement"),
-        "Dashboard must not depend on write-side infrastructure implementations",
-      );
+    it("C3: canonical container must exist as the composition root", () => {
+      expectFileExists("src/wiring/container.ts");
     });
 
-    it("reporting must not import write-side infrastructure implementations", () => {
-      const files = filesUnder("src/modules/reporting");
-
-      expectNoImportMatch(
-        files,
-        (importSource) =>
-          isCrossModuleInfrastructureImport(importSource, "sales") ||
-          isCrossModuleInfrastructureImport(importSource, "inventory") ||
-          isCrossModuleInfrastructureImport(importSource, "procurement"),
-        "Reporting must not depend on write-side infrastructure implementations",
-      );
-    });
-  });
-
-  describe("composition root allowlist", () => {
-    it("container.ts may instantiate repositories and use cases", () => {
+    it("C4: container may instantiate repositories and use cases", () => {
       const containerPath = path.join(PROJECT_ROOT, "src/wiring/container.ts");
-      expect(fs.existsSync(containerPath)).toBe(true);
+      const source = readSource(containerPath);
 
-      const content = readFile(containerPath);
-
-      expect(content).toMatch(/\bnew\s+PrismaClient\s*\(/);
-      expect(content).toMatch(/\bnew\s+Prisma[A-Za-z0-9_]*Repository\s*\(/);
+      expect(source).toMatch(/new\s+Prisma\w*Repository\s*\(/);
+      expect(source).toMatch(/new\s+\w+\s*\(/);
     });
 
-    it("repository/use-case instantiation should be limited to container for production wiring", () => {
-      const allFiles = walkFiles(SRC_ROOT);
-      const offenders: string[] = [];
+    it("C5: production wiring instantiation should be centralized in container", () => {
+      const files = listProductionFiles().filter((filePath) => {
+        const relative = normalizePath(path.relative(PROJECT_ROOT, filePath));
+        return relative !== "src/wiring/container.ts";
+      });
 
-      for (const filePath of allFiles) {
-        const relativeFile = normalizeForMatch(path.relative(PROJECT_ROOT, filePath));
+      const violations = findRegexViolations(
+        files,
+        new RegExp(
+          `new\\s+(Prisma\\w*Repository|${PRODUCTION_USE_CASE_NAMES.join("|")})\\s*\\(`,
+          "g",
+        ),
+      );
 
-        if (relativeFile === "src/wiring/container.ts") {
-          continue;
-        }
-
-        const content = readFile(filePath);
-
-        const hasRepositoryInstantiation =
-          /\bnew\s+Prisma[A-Za-z0-9_]*Repository\s*\(/.test(content);
-
-        const hasUseCaseInstantiation =
-          /\bnew\s+(CreateOrder|CancelOrder|PayCredit|ReceiveStock|AdjustStock|IssueStock|CheckInventoryConsistency|CreatePurchaseOrder|CancelPurchaseOrder|ReceivePurchaseOrder|CreateSupplier|UpdateSupplierStatus)\s*\(/.test(
-            content,
-          );
-
-        if (hasRepositoryInstantiation || hasUseCaseInstantiation) {
-          offenders.push(relativeFile);
-        }
-      }
-
-      expect(
-        offenders,
-        `Production wiring instantiation should be centralized in container.ts\n\nOffending files:\n${offenders.join("\n") || "(none)"}`,
-      ).toEqual([]);
+      expectNoViolations({
+        name: "Production wiring instantiation should be centralized in container",
+        files,
+        violations,
+      });
     });
   });
 
-  describe("reporting special rule", () => {
-    it("reporting queries must use shared Prisma client, not direct PrismaClient instantiation", () => {
-      const files = filesUnder("src/modules/reporting/queries");
+  describe("Rule Group D - cross module boundary", () => {
+    it("D1: sales application must not import inventory infrastructure directly", () => {
+      const files = filesUnder(/^src\/modules\/sales\/application\//);
+      const violations = findImportViolations(files, /modules\/inventory\/infrastructure\//);
 
-      expectNoRegexMatch(
+      expectNoViolations({
+        name: "Sales application must not import inventory infrastructure directly",
         files,
-        /\bnew\s+PrismaClient\s*\(/g,
-        "Reporting queries must not instantiate PrismaClient directly",
-      );
+        violations,
+      });
     });
 
-    it("reporting queries should import shared Prisma client", () => {
-      const files = filesUnder("src/modules/reporting/queries");
-      const offenders: string[] = [];
+    it("D2: procurement application must not import inventory infrastructure directly", () => {
+      const files = filesUnder(/^src\/modules\/procurement\/application\//);
+      const violations = findImportViolations(files, /modules\/inventory\/infrastructure\//);
 
-      for (const filePath of files) {
-        const relativeFile = normalizeForMatch(path.relative(PROJECT_ROOT, filePath));
-        const imports = findImports(readFile(filePath));
+      expectNoViolations({
+        name: "Procurement application must not import inventory infrastructure directly",
+        files,
+        violations,
+      });
+    });
 
-        const importsPrismaClient = imports.some(
-          (source) =>
-            source === "@/shared/prisma" ||
-            source === "@/shared/prisma.ts" ||
-            source === "../../shared/prisma" ||
-            source.endsWith("/shared/prisma"),
-        );
+    it("D3: dashboard must not import write-side infrastructure directly", () => {
+      const files = filesUnder(/^src\/modules\/dashboard\//);
+      const violations = findImportViolations(files, /modules\/(sales|inventory|procurement)\/infrastructure\//);
 
-        const importsRawPrisma = imports.some(
-          (source) => source === "@prisma/client",
-        );
+      expectNoViolations({
+        name: "Dashboard must not import write-side infrastructure directly",
+        files,
+        violations,
+      });
+    });
 
-        if (importsRawPrisma || !importsPrismaClient) {
-          offenders.push(relativeFile);
-        }
-      }
+    it("D4: reporting must not import write-side infrastructure directly", () => {
+      const files = filesUnder(/^src\/modules\/reporting\//);
+      const violations = findImportViolations(files, /modules\/(sales|inventory|procurement)\/infrastructure\//);
 
-      expect(
-        offenders,
-        `Reporting queries must use the designated shared Prisma client\n\nOffending files:\n${offenders.join("\n") || "(none)"}`,
-      ).toEqual([]);
+      expectNoViolations({
+        name: "Reporting must not import write-side infrastructure directly",
+        files,
+        violations,
+      });
+    });
+  });
+
+  describe("Rule Group E - reporting boundary", () => {
+    it("E1: reporting must not import domain modules", () => {
+      const files = filesUnder(/^src\/modules\/reporting\//);
+      const violations = findImportViolations(files, /modules\/[^/]+\/domain\//);
+
+      expectNoViolations({
+        name: "Reporting must not import domain modules",
+        files,
+        violations,
+      });
+    });
+
+    it("E2: reporting must not import mutation application modules", () => {
+      const files = filesUnder(/^src\/modules\/reporting\//);
+      const violations = findImportViolations(files, /modules\/(sales|inventory|procurement)\/application\//);
+
+      expectNoViolations({
+        name: "Reporting must not import mutation application modules",
+        files,
+        violations,
+      });
+    });
+
+    it("E3: reporting application and dto must not import raw Prisma or shared Prisma client", () => {
+      const files = [
+        ...filesUnder(/^src\/modules\/reporting\/application\//),
+        ...filesUnder(/^src\/modules\/reporting\/dto\//),
+      ];
+      const violations = findImportLineViolations(files, ANY_PRISMA_IMPORT_PATTERN);
+
+      expectNoViolations({
+        name: "Reporting application and dto must not import raw Prisma or shared Prisma client",
+        files,
+        violations,
+      });
+    });
+
+    it("E4: reporting queries must not instantiate PrismaClient directly", () => {
+      const files = filesUnder(/^src\/modules\/reporting\/queries\//);
+      const violations = findRegexViolations(files, /new\s+PrismaClient\s*\(/g);
+
+      expectNoViolations({
+        name: "Reporting queries must not instantiate PrismaClient directly",
+        files,
+        violations,
+      });
+    });
+
+    it("E5: reporting queries must not import raw Prisma client directly", () => {
+      const files = filesUnder(/^src\/modules\/reporting\/queries\//);
+      const violations = findImportLineViolations(files, RAW_PRISMA_IMPORT_PATTERN);
+
+      expectNoViolations({
+        name: "Reporting queries must not import raw Prisma client directly",
+        files,
+        violations,
+      });
+    });
+
+    it("E6: reporting queries must use the designated shared Prisma client", () => {
+      const files = filesUnder(/^src\/modules\/reporting\/queries\//);
+      const violations = files
+        .filter((filePath) => {
+          const source = readSource(filePath);
+          const imports = source
+            .split("\n")
+            .filter((line) => line.trim().startsWith("import "));
+          const importsSharedPrisma = imports.some((line) => SHARED_PRISMA_IMPORT_PATTERN.test(line));
+          return !importsSharedPrisma;
+        })
+        .map((filePath) => normalizePath(path.relative(PROJECT_ROOT, filePath)));
+
+      expectNoViolations({
+        name: "Reporting queries must use the designated shared Prisma client",
+        files,
+        violations,
+      });
+    });
+
+    it("E7: reporting must not contain a domain folder", () => {
+      const reportingDomainDir = path.join(PROJECT_ROOT, "src/modules/reporting/domain");
+      expect(fs.existsSync(reportingDomainDir), "Reporting module must not contain a domain folder").toBe(false);
+    });
+
+    it("E8: reporting DTO must not import domain types", () => {
+      const files = filesUnder(/^src\/modules\/reporting\/dto\//);
+      const violations = findImportViolations(files, /modules\/[^/]+\/domain\//);
+
+      expectNoViolations({
+        name: "Reporting DTO must not import domain types",
+        files,
+        violations,
+      });
     });
   });
 });

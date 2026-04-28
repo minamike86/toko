@@ -57,15 +57,15 @@ class FakeCatalogReadRepository implements CatalogReadRepository {
   ];
 
   async getProductsByIds(ids: string[]): Promise<CatalogProductSnapshot[]> {
-    return this.products.filter((p) => ids.includes(p.productId));
+    return this.products.filter((product) => ids.includes(product.productId));
   }
 
   async getVariantsByIds(ids: string[]): Promise<CatalogVariantReadModel[]> {
-    return this.variants.filter((v) => ids.includes(v.variantId));
+    return this.variants.filter((variant) => ids.includes(variant.variantId));
   }
 
   async listPosVariants(): Promise<CatalogVariantReadModel[]> {
-    return this.variants.filter((v) => v.isActive);
+    return this.variants.filter((variant) => variant.isActive);
   }
 }
 
@@ -202,7 +202,7 @@ describe("CreateOrder Use Case", () => {
       }),
     ).rejects.toMatchObject({
       name: "NotFoundError",
-      message: "ProductVariant not found: VX99",
+      message: "ProductVariant with id VX99 not found",
     });
   });
 

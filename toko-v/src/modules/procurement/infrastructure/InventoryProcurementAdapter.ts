@@ -1,27 +1,31 @@
-import {
+import type {
   InventoryProcurementPort,
-  ReceiveProcurementStockRequest,
+  ReceiveProcurementStockInput,
 } from "@/modules/procurement/application/ports/InventoryProcurementPort";
-import { ReceivePurchaseStock } from "@/modules/inventory/application/ReceivePurchaseStock";
-import { ActorContext } from "@/shared/system/types/actor-context";
+import {
+  ReceiveStock,
+  type ReceiveStockRequest,
+} from "@/modules/inventory/application/ReceiveStock";
+import type { ActorContext } from "@/shared/system/types/actor-context";
 
 export class InventoryProcurementAdapter implements InventoryProcurementPort {
   constructor(
-    private readonly receivePurchaseStockUseCase: ReceivePurchaseStock,
-    private readonly actor: ActorContext,
+    private readonly receiveStockUseCase: ReceiveStock,
+    private readonly defaultActor: ActorContext,
   ) { }
 
-  async receivePurchaseStock(
-    requests: ReceiveProcurementStockRequest[],
+  async receiveProcurementStock(
+    input: ReceiveProcurementStockInput,
   ): Promise<void> {
-    await this.receivePurchaseStockUseCase.execute(
-      requests.map((request) => ({
-        variantId: request.variantId,
-        quantity: request.quantity,
-        reason: request.reason,
-        referenceId: request.referenceId,
-        actor: this.actor,
-      })),
-    );
+    for (const item of input.items) {
+      const request: ReceiveStockRequest = {
+        variantId: item.variantId,
+        quantity: item.quantity,
+        reason: item.reason,
+        referenceId: item.referenceId,
+      };
+
+      await this.receiveStockUseCase.execute(request, this.defaultActor);
+    }
   }
 }

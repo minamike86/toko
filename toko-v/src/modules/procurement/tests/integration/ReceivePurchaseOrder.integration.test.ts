@@ -3,11 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { CreatePurchaseOrder } from "@/modules/procurement/application/use-cases/CreatePurchaseOrder";
 import { ReceivePurchaseOrder } from "@/modules/procurement/application/use-cases/ReceivePurchaseOrder";
 import { CatalogSnapshotPort } from "@/modules/procurement/application/ports/CatalogSnapshotPort";
+import type { ProcurementUnitNormalizationPort } from "@/shared/application/unit-normalization/procurement-unit-normalization.port";
 import { Supplier } from "@/modules/procurement/domain/Supplier";
 import { PrismaPurchaseOrderRepository } from "@/modules/procurement/infrastructure/prisma/PrismaPurchaseOrderRepository";
 import { PrismaSupplierRepository } from "@/modules/procurement/infrastructure/prisma/PrismaSupplierRepository";
 import { InventoryProcurementAdapter } from "@/modules/procurement/infrastructure/InventoryProcurementAdapter";
-import { ReceivePurchaseStock } from "@/modules/inventory/application/ReceivePurchaseStock";
+import { ReceiveStock } from "@/modules/inventory/application/ReceiveStock";
 import { PrismaInventoryRepository } from "@/modules/inventory/infrastructure/PrismaInventoryRepository";
 import { UserRole } from "@/modules/user/domain/UserRole";
 import { prisma } from "@/shared/prisma";
@@ -25,12 +26,42 @@ class FakeCatalogSnapshotPort implements CatalogSnapshotPort {
   }
 }
 
+class IdentityNormalizationPort implements ProcurementUnitNormalizationPort {
+  async normalizeProcurementItem(input: {
+    variantId: string;
+    transactionUnit: string;
+    transactionQuantity: number;
+    referenceId: string;
+  }): Promise<{
+    variantId: string;
+    transactionUnit: string;
+    transactionQuantity: number;
+    canonicalUnit: string;
+    canonicalQuantity: number;
+    referenceId: string;
+  }> {
+    return {
+      variantId: input.variantId,
+      transactionUnit: input.transactionUnit,
+      transactionQuantity: input.transactionQuantity,
+      canonicalUnit: input.transactionUnit,
+      canonicalQuantity: input.transactionQuantity,
+      referenceId: input.referenceId,
+    };
+  }
+}
+
 describe("ReceivePurchaseOrder integration", () => {
   const supplierRepository = new PrismaSupplierRepository();
   const purchaseOrderRepository = new PrismaPurchaseOrderRepository();
   const inventoryRepository = new PrismaInventoryRepository(prisma);
 
   beforeEach(async () => {
+
+    await prisma.purchaseReturnReductionItem.deleteMany();
+    await prisma.purchaseReturnReduction.deleteMany();
+    await prisma.supplierPayment.deleteMany();
+
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
@@ -108,12 +139,12 @@ describe("ReceivePurchaseOrder integration", () => {
       },
     );
 
-    const receivePurchaseStock = new ReceivePurchaseStock({
+    const receiveStock = new ReceiveStock({
       inventoryRepo: inventoryRepository,
     });
 
     const inventoryProcurementAdapter = new InventoryProcurementAdapter(
-      receivePurchaseStock,
+      receiveStock,
       {
         actorId: "user-1",
         role: UserRole.ADMIN,
@@ -122,18 +153,17 @@ describe("ReceivePurchaseOrder integration", () => {
 
     const receivePurchaseOrder = new ReceivePurchaseOrder(
       purchaseOrderRepository,
+      new IdentityNormalizationPort(),
       inventoryProcurementAdapter,
     );
 
-    const receivedOrder = await receivePurchaseOrder.execute(
-      {
-        purchaseOrderId: createdOrder.id,
-      },
-      {
+    const receivedOrder = await receivePurchaseOrder.execute({
+      purchaseOrderId: createdOrder.id,
+      actor: {
         actorId: "user-1",
         role: UserRole.ADMIN,
       },
-    );
+    });
 
     expect(receivedOrder.status).toBe("RECEIVED");
     expect(receivedOrder.receivedBy).toBe("user-1");
@@ -150,16 +180,19 @@ describe("ReceivePurchaseOrder integration", () => {
     });
 
     expect(movements).toHaveLength(1);
-    expect(movements[0].variantId).toBe("var-1");
-    expect(movements[0].type).toBe("IN");
-    expect(movements[0].origin).toBe("PURCHASE");
-    expect(movements[0].referenceId).toBe(createdOrder.id);
+    expect(movements[0]).toMatchObject({
+      variantId: "var-1",
+      type: "IN",
+      quantity: 2,
+      reason: "PROCUREMENT_RECEIVE",
+      origin: "PURCHASE",
+      referenceId: createdOrder.id,
+    });
 
     const persistedOrder = await prisma.purchaseOrder.findUnique({
       where: { id: createdOrder.id },
     });
 
-    expect(persistedOrder).not.toBeNull();
     expect(persistedOrder?.status).toBe("RECEIVED");
     expect(persistedOrder?.receivedBy).toBe("user-1");
   });

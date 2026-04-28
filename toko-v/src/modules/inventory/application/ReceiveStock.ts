@@ -1,44 +1,96 @@
 import { AuthorizationGuard } from "@/shared/system/application/AuthorizationGuard";
-import { ActorContext } from "@/shared/system/types/actor-context";
+import type { ActorContext } from "@/shared/system/types/actor-context";
+import { UserRole } from "@/modules/user/domain/UserRole";
+import { InventoryRepository } from "@/modules/inventory/domain/InventoryRepository";
+import { StockMovement } from "@/modules/inventory/domain/StockMovement";
 
-import { InventoryRepository } from "../domain/InventoryRepository";
-import { StockMovement } from "../domain/StockMovement";
-import { ReceiveStockRequest } from "./InventoryService";
+export type InventoryMutationReason = "PROCUREMENT_RECEIVE";
 
-type Deps = {
-  inventoryRepo: InventoryRepository;
+export type ReceiveStockRequest = {
+  variantId: string;
+  quantity: number;
+  reason: InventoryMutationReason;
+  referenceId?: string;
 };
 
+export class InvalidQuantityError extends Error {
+  constructor() {
+    super("Receive stock quantity must be greater than zero");
+    this.name = "InvalidQuantityError";
+  }
+}
+
+export class InventoryNotFoundError extends Error {
+  constructor(variantId: string) {
+    super(`Inventory item not found for variant ${variantId}`);
+    this.name = "InventoryNotFoundError";
+  }
+}
+
+export class InvalidStockReasonError extends Error {
+  constructor(reason: string) {
+    super(`Invalid receive stock reason: ${reason}`);
+    this.name = "InvalidStockReasonError";
+  }
+}
+
+function assertReason(reason: string): InventoryMutationReason {
+  if (reason !== "PROCUREMENT_RECEIVE") {
+    throw new InvalidStockReasonError(reason);
+  }
+
+  return reason;
+}
+
+function assertQuantity(quantity: number): number {
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new InvalidQuantityError();
+  }
+
+  return quantity;
+}
+
 export class ReceiveStock {
-  constructor(private readonly deps: Deps) { }
+  constructor(
+    private readonly deps: {
+      inventoryRepo: InventoryRepository;
+    },
+  ) { }
 
   async execute(
-    requests: ReceiveStockRequest[],
-    actor: ActorContext,
+    input: ReceiveStockRequest,
+    actorParam: ActorContext,
   ): Promise<void> {
-    AuthorizationGuard.assertAuthorized(actor, ["ADMIN", "WAREHOUSE"]);
+    AuthorizationGuard.assertAuthorized(actorParam, [
+      UserRole.ADMIN,
+      UserRole.WAREHOUSE,
+    ]);
 
-    for (const req of requests) {
-      const item = await this.deps.inventoryRepo.findByVariantId(req.variantId);
+    const quantity = assertQuantity(input.quantity);
+    const reason = assertReason(input.reason);
 
-      if (!item) {
-        throw new Error(`Inventory item tidak ditemukan: ${req.variantId}`);
-      }
+    const inventoryItem = await this.deps.inventoryRepo.findByVariantId(
+      input.variantId,
+    );
 
-      await this.deps.inventoryRepo.increaseByVariantId(
-        req.variantId,
-        req.quantity,
-      );
-
-      const movement = StockMovement.in({
-        variantId: req.variantId,
-        quantity: req.quantity,
-        reason: req.reason,
-        origin: "LEGACY",
-        referenceId: req.referenceId,
-      });
-
-      await this.deps.inventoryRepo.saveMovement(movement);
+    if (!inventoryItem) {
+      throw new InventoryNotFoundError(input.variantId);
     }
+
+    await this.deps.inventoryRepo.increaseByVariantId(
+      input.variantId,
+      quantity,
+    );
+
+    const movement = StockMovement.in({
+      productId: null,
+      variantId: input.variantId,
+      quantity,
+      reason,
+      origin: "PURCHASE",
+      referenceId: input.referenceId,
+    });
+
+    await this.deps.inventoryRepo.saveMovement(movement);
   }
 }

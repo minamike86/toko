@@ -34,6 +34,20 @@ import { InventoryServiceAdapter } from "@/modules/inventory/infrastructure/Inve
 import { CancelPurchaseOrder } from "@/modules/procurement/application/use-cases/CancelPurchaseOrder";
 import { PrismaPurchaseOrderRepository } from "@/modules/procurement/infrastructure/prisma/PrismaPurchaseOrderRepository";
 
+/* ========================
+   PROCUREMENT - PAYABLE
+   ======================== */
+import { DefaultStep7AuthorizationGuard } from "@/modules/procurement/application/payable/Step7AuthorizationGuard";
+import type { Step7UnitOfWork } from "@/modules/procurement/application/payable/Step7UnitOfWork";
+import { RecordSupplierPayment } from "@/modules/procurement/application/payable/RecordSupplierPayment";
+import { GetSupplierOutstanding } from "@/modules/procurement/application/payable/GetSupplierOutstanding";
+import { HandlePurchaseReturn } from "@/modules/procurement/application/payable/HandlePurchaseReturn";
+import { PrismaPurchaseOrderPayableReader } from "@/modules/procurement/infrastructure/payable/PrismaPurchaseOrderPayableReader";
+import { PrismaPurchaseReturnRepository } from "@/modules/procurement/infrastructure/payable/PrismaPurchaseReturnRepository";
+import { PrismaSupplierPayableQuery } from "@/modules/procurement/infrastructure/payable/PrismaSupplierPayableQuery";
+import { PrismaSupplierPayableReader } from "@/modules/procurement/infrastructure/payable/PrismaSupplierPayableReader";
+import { PrismaSupplierPaymentRepository } from "@/modules/procurement/infrastructure/payable/PrismaSupplierPaymentRepository";
+
 /* ======================
    CATALOG (READ ONLY)
    ====================== */
@@ -46,6 +60,16 @@ import { PrismaCatalogReadRepository } from "@/modules/catalog/infrastructure/Pr
    ====================== */
 
 const prisma = new PrismaClient();
+
+/* ========================
+   PROCUREMENT - PAYABLE
+   ======================== */
+
+class ImmediateStep7UnitOfWork implements Step7UnitOfWork {
+   async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
+      return operation();
+   }
+}
 
 /* ======================
    REPOSITORIES
@@ -61,6 +85,22 @@ export const inventoryRepo = new PrismaInventoryRepository(prisma);
 
 // Procurement
 export const purchaseOrderRepo = new PrismaPurchaseOrderRepository(prisma);
+
+// PROCUREMENT - PAYABLE
+export const purchaseOrderPayableReader =
+   new PrismaPurchaseOrderPayableReader(prisma);
+
+export const supplierPayableReader =
+   new PrismaSupplierPayableReader(prisma);
+
+export const supplierPaymentRepo =
+   new PrismaSupplierPaymentRepository(prisma);
+
+export const purchaseReturnRepo =
+   new PrismaPurchaseReturnRepository(prisma);
+
+export const supplierPayableQuery =
+   new PrismaSupplierPayableQuery(prisma);
 
 // Catalog
 export const catalogReadRepo = new PrismaCatalogReadRepository();
@@ -132,6 +172,41 @@ export const payCredit = new PayCredit(
 
 export const cancelPurchaseOrder = new CancelPurchaseOrder({
    purchaseOrderRepo,
+});
+
+// PROCUREMENT - PAYABLE
+
+const step7Authorization = new DefaultStep7AuthorizationGuard();
+const step7UnitOfWork = new ImmediateStep7UnitOfWork();
+
+const step7Context = {
+   now: () => new Date(),
+};
+
+export const recordSupplierPayment = new RecordSupplierPayment({
+   authorization: step7Authorization,
+   unitOfWork: step7UnitOfWork,
+   purchaseOrders: purchaseOrderPayableReader,
+   suppliers: supplierPayableReader,
+   payments: supplierPaymentRepo,
+   returns: purchaseReturnRepo,
+   context: step7Context,
+});
+
+export const getSupplierOutstanding = new GetSupplierOutstanding({
+   authorization: step7Authorization,
+   suppliers: supplierPayableReader,
+   payableQuery: supplierPayableQuery,
+});
+
+export const handlePurchaseReturn = new HandlePurchaseReturn({
+   authorization: step7Authorization,
+   unitOfWork: step7UnitOfWork,
+   purchaseOrders: purchaseOrderPayableReader,
+   suppliers: supplierPayableReader,
+   payments: supplierPaymentRepo,
+   returns: purchaseReturnRepo,
+   context: step7Context,
 });
 
 /* ======================
