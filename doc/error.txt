@@ -1,0 +1,307 @@
+PS C:\belajar_nextjs15\github\toko\toko-v> npx tsc --noEmit             
+PS C:\belajar_nextjs15\github\toko\toko-v> npx vitest run --maxWorkers=1
+
+ RUN  v4.0.18 C:/belajar_nextjs15/github/toko/toko-v
+
+ ✓ src/app/procurement/purchase-orders/[id]/_components/CancelPurchaseOrderButton.test.tsx (7 tests) 381ms
+ ✓ src/modules/reporting/tests/integration/inventory-movement-history.integration.test.ts (5 tests) 272ms
+stdout | src/modules/sales/tests/integration/PayCredit.prisma.integration.test.ts > PayCredit Prisma Integration > prevents duplicate full settlement on double submit without idempotency key
+prisma:error 
+Invalid `prisma.order.updateMany()` invocation:
+
+
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+
+ ✓ src/modules/sales/tests/integration/PayCredit.prisma.integration.test.ts (5 tests) 256ms
+ ✓ src/modules/reporting/tests/integration/inventory-snapshot.integration.test.ts (4 tests) 149ms
+ ✓ src/app/tests/page.test.ts (2 tests) 147ms
+ ✓ src/tests/architecture/dependency-wiring-boundary.test.ts (16 tests) 130ms
+ ✓ src/components/dashboard/tests/CashClarityList.test.tsx (2 tests) 94ms
+ ✓ src/modules/reporting/tests/integration/inventory-low-stock.integration.test.ts (5 tests) 116ms
+ ✓ src/components/dashboard/tests/SummaryCards.test.tsx (2 tests) 89ms
+stdout | src/modules/sales/tests/integration/CreateAndCancelOrder.integration.test.ts > Integration: CreateOrder → Inventory → CancelOrder > creates CASH OFFLINE order (PAID), reduces stock, then cancels and restores stock
+[CreateOrder] input: {
+  orderId: 'ORDER-1',
+  type: 'OFFLINE',
+  payment: 'CASH',
+  actor: { actorId: 'user-1', role: 'SALES' },
+  items: [ { variantId: 'V001', quantity: 2 } ]
+}
+
+stdout | src/modules/sales/tests/integration/CreateAndCancelOrder.integration.test.ts > Integration: CreateOrder → Inventory → CancelOrder > creates CASH OFFLINE order (PAID), reduces stock, then cancels and restores stock
+[CreateOrder] variants found: [
+  {
+    variantId: 'V001',
+    productId: 'P001',
+    productName: 'Produk Test',
+    variantName: 'Default',
+    unit: 'pcs',
+    price: 10000,
+    isActive: true
+  }
+]
+
+stdout | src/modules/sales/tests/integration/CreateAndCancelOrder.integration.test.ts > Integration: CreateOrder → Inventory → CancelOrder > creates CASH OFFLINE order (PAID), reduces stock, then cancels and restores stock
+[CreateOrder] issueStock requests: [
+  {
+    variantId: 'V001',
+    quantity: 2,
+    reason: 'SALE_ORDER',
+    referenceId: 'ORDER-1'
+  }
+]
+
+ ✓ src/modules/sales/tests/integration/CreateAndCancelOrder.integration.test.ts (1 test) 86ms
+ ✓ src/modules/procurement/tests/integration/ReceivePurchaseOrder.integration.test.ts (1 test) 85ms
+ ✓ src/components/dashboard/tests/LowStockList.test.tsx (3 tests) 93ms
+ ✓ src/modules/reporting/tests/integration/sales-summary.integration.test.ts (1 test) 80ms
+ ✓ src/modules/reporting/tests/integration/credit-outstanding.integration.test.ts (1 test) 69ms
+ ✓ src/components/dashboard/tests/OutstandingList.test.tsx (2 tests) 83ms
+ ✓ src/modules/procurement/tests/integration/PrismaPurchaseOrderRepository.integration.test.ts (3 tests) 116ms
+ ✓ src/modules/procurement/tests/integration/CancelPurchaseOrder.integration.test.ts (2 tests) 74ms
+ ✓ src/modules/procurement/tests/integration/CreatePurchaseOrder.integration.test.ts (3 tests) 61ms
+ ✓ src/modules/procurement/tests/integration/PrismaSupplierRepository.integration.test.ts (3 tests) 50ms
+ ✓ src/modules/reporting/tests/integration/credit-payment-history.integration.test.ts (1 test) 47ms
+ ✓ src/modules/procurement/tests/integration/CreateSupplier.integration.test.ts (2 tests) 45ms
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > membuat order CASH dan langsung PAID
+[CreateOrder] input: {
+  orderId: 'ORD-100',
+  type: 'OFFLINE',
+  payment: 'CASH',
+  actor: { actorId: 'USER-1', role: 'SALES' },
+  items: [ { variantId: 'V001', quantity: 2 } ]
+}
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > membuat order CASH dan langsung PAID
+[CreateOrder] variants found: [
+  {
+    variantId: 'V001',
+    productId: 'P001',
+    productName: 'Produk Test',
+    variantName: 'Default',
+    unit: 'pcs',
+    price: 10000,
+    isActive: true
+  }
+]
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > membuat order CASH dan langsung PAID
+[CreateOrder] issueStock requests: [
+  {
+    variantId: 'V001',
+    quantity: 2,
+    reason: 'SALE_ORDER',
+    referenceId: 'ORD-100'
+  }
+]
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > membuat order CREDIT dan berstatus ON_CREDIT
+[CreateOrder] input: {
+  orderId: 'ORD-101',
+  type: 'OFFLINE',
+  payment: 'CREDIT',
+  actor: { actorId: 'ADMIN-1', role: 'ADMIN' },
+  items: [ { variantId: 'V001', quantity: 2 } ]
+}
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > membuat order CREDIT dan berstatus ON_CREDIT
+[CreateOrder] variants found: [
+  {
+    variantId: 'V001',
+    productId: 'P001',
+    productName: 'Produk Test',
+    variantName: 'Default',
+    unit: 'pcs',
+    price: 10000,
+    isActive: true
+  }
+]
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > membuat order CREDIT dan berstatus ON_CREDIT
+[CreateOrder] issueStock requests: [
+  {
+    variantId: 'V001',
+    quantity: 2,
+    reason: 'SALE_ORDER',
+    referenceId: 'ORD-101'
+  }
+]
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > menandai order sebagai FAILED jika inventory gagal
+[CreateOrder] input: {
+  orderId: 'ORD-102',
+  type: 'OFFLINE',
+  payment: 'CASH',
+  actor: { actorId: 'USER-1', role: 'SALES' },
+  items: [ { variantId: 'V001', quantity: 2 } ]
+}
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > menandai order sebagai FAILED jika inventory gagal
+[CreateOrder] variants found: [
+  {
+    variantId: 'V001',
+    productId: 'P001',
+    productName: 'Produk Test',
+    variantName: 'Default',
+    unit: 'pcs',
+    price: 10000,
+    isActive: true
+  }
+]
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > menandai order sebagai FAILED jika inventory gagal
+[CreateOrder] issueStock requests: [
+  {
+    variantId: 'V001',
+    quantity: 2,
+    reason: 'SALE_ORDER',
+    referenceId: 'ORD-102'
+  }
+]
+
+stderr | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > menandai order sebagai FAILED jika inventory gagal
+[CreateOrder] issueStock failed: Error: inventory gagal
+    at SpyInventoryService.issueStock (C:/belajar_nextjs15/github/toko/toko-v/src/modules/sales/tests/CreateOrder.test.ts:78:13)
+    at CreateOrder.execute (C:/belajar_nextjs15/github/toko/toko-v/src/modules/sales/application/CreateOrder.ts:117:40)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at C:/belajar_nextjs15/github/toko/toko-v/src/modules/sales/tests/CreateOrder.test.ts:179:5
+    at file:///C:/belajar_nextjs15/github/toko/toko-v/node_modules/@vitest/runner/dist/index.js:915:20
+[CreateOrder] issueStock meta: {
+  name: 'Error',
+  message: 'inventory gagal',
+  constructorName: 'Error',
+  stack: 'Error: inventory gagal\n' +
+    '    at SpyInventoryService.issueStock (C:/belajar_nextjs15/github/toko/toko-v/src/modules/sales/tests/CreateOrder.test.ts:78:13)\n' +
+    '    at CreateOrder.execute (C:/belajar_nextjs15/github/toko/toko-v/src/modules/sales/application/CreateOrder.ts:117:40)\n' +
+    '    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n' +
+    '    at C:/belajar_nextjs15/github/toko/toko-v/src/modules/sales/tests/CreateOrder.test.ts:179:5\n' +
+    '    at file:///C:/belajar_nextjs15/github/toko/toko-v/node_modules/@vitest/runner/dist/index.js:915:20'
+}
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > melempar NotFoundError jika variant tidak ditemukan
+[CreateOrder] input: {
+  orderId: 'ORD-103',
+  type: 'OFFLINE',
+  payment: 'CASH',
+  actor: { actorId: 'USER-1', role: 'SALES' },
+  items: [ { variantId: 'VX99', quantity: 1 } ]
+}
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > melempar NotFoundError jika variant tidak ditemukan
+[CreateOrder] variants found: []
+
+stderr | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > melempar NotFoundError jika variant tidak ditemukan
+[CreateOrder] variant not found: { requestedVariantId: 'VX99', availableVariantIds: [] }
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > menolak actor yang tidak ada
+[CreateOrder] input: {
+  orderId: 'ORD-104',
+  type: 'OFFLINE',
+  payment: 'CASH',
+  actor: undefined,
+  items: [ { variantId: 'V001', quantity: 1 } ]
+}
+
+stdout | src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > menolak role yang tidak berhak
+[CreateOrder] input: {
+  orderId: 'ORD-105',
+  type: 'OFFLINE',
+  payment: 'CASH',
+  actor: { actorId: 'WH-1', role: 'WAREHOUSE' },
+  items: [ { variantId: 'V001', quantity: 1 } ]
+}
+
+ ❯ src/modules/sales/tests/CreateOrder.test.ts (6 tests | 1 failed) 35ms
+     ✓ membuat order CASH dan langsung PAID 7ms
+     ✓ membuat order CREDIT dan berstatus ON_CREDIT 2ms
+     ✓ menandai order sebagai FAILED jika inventory gagal 15ms
+     × melempar NotFoundError jika variant tidak ditemukan 8ms
+     ✓ menolak actor yang tidak ada 1ms
+     ✓ menolak role yang tidak berhak 1ms
+ ✓ src/modules/procurement/tests/integration/UpdateSupplierStatus.integration.test.ts (2 tests) 39ms
+ ✓ src/app/api/procurement/purchase-orders/[id]/cancel/route.test.ts (7 tests) 33ms
+ ✓ src/tests/architecture/reporting-boundary.test.ts (7 tests) 26ms
+ ✓ src/modules/procurement/tests/architecture/procurement-boundary.test.ts (7 tests) 23ms
+stdout | src/modules/sales/tests/CancelOrder.test.ts > CancelOrder Use Case > cancels PAID order dan mengembalikan stok
+[CreateOrder] input: {
+  orderId: 'ORD-301',
+  type: 'OFFLINE',
+  payment: 'CASH',
+  actor: { actorId: 'USER-1', role: 'SALES' },
+  items: [ { variantId: 'V001', quantity: 2 } ]
+}
+
+stdout | src/modules/sales/tests/CancelOrder.test.ts > CancelOrder Use Case > cancels PAID order dan mengembalikan stok
+[CreateOrder] variants found: [
+  {
+    variantId: 'V001',
+    productId: 'P001',
+    productName: 'Produk Test',
+    variantName: 'Default',
+    unit: 'pcs',
+    price: 10000,
+    isActive: true
+  }
+]
+
+stdout | src/modules/sales/tests/CancelOrder.test.ts > CancelOrder Use Case > cancels PAID order dan mengembalikan stok
+[CreateOrder] issueStock requests: [
+  {
+    variantId: 'V001',
+    quantity: 2,
+    reason: 'SALE_ORDER',
+    referenceId: 'ORD-301'
+  }
+]
+
+ ✓ src/modules/sales/tests/CancelOrder.test.ts (4 tests) 9ms
+ ✓ src/modules/sales/tests/PayCredit.test.ts (10 tests) 10ms
+ ✓ src/modules/procurement/tests/application/ReceivePurchaseOrder.test.ts (5 tests) 12ms
+ ✓ src/modules/procurement/tests/application/CreatePurchaseOrder.test.ts (7 tests) 14ms
+ ✓ src/modules/procurement/tests/domain/PurchaseOrder.test.ts (6 tests) 6ms
+ ✓ src/modules/inventory/tests/ReceiveStock.test.ts (3 tests) 11ms
+ ✓ src/modules/inventory/tests/AdjustStock.test.ts (3 tests) 6ms
+ ✓ src/modules/reporting/tests/integration/get-inventory-snapshot-report.test.ts (2 tests) 7ms
+ ✓ src/modules/procurement/tests/application/CancelPurchaseOrder.test.ts (4 tests) 5ms
+ ✓ src/modules/procurement/tests/application/CreateSupplier.test.ts (3 tests) 4ms
+ ✓ src/modules/dashboard/tests/get-warehouse-dashboard.test.ts (1 test) 4ms
+ ✓ src/tests/architecture/usecase-deps.test.ts (1 test) 11ms
+ ✓ src/modules/procurement/tests/application/UpdateSupplierStatus.test.ts (3 tests) 7ms
+ ✓ src/modules/reporting/tests/integration/get-credit-payment-history-report.test.ts (1 test) 4ms
+ ✓ src/modules/dashboard/tests/get-cash-clarity-dashboard.test.ts (1 test) 4ms
+ ✓ src/modules/inventory/tests/ConcurrentIssueStock.test.ts (1 test) 4ms
+ ✓ src/modules/inventory/tests/IssueStock.test.ts (1 test) 4ms
+ ✓ src/modules/reporting/tests/integration/get-credit-outstanding-report.test.ts (1 test) 4ms
+ ✓ src/modules/procurement/tests/domain/Supplier.test.ts (4 tests) 5ms
+ ✓ src/modules/procurement/tests/domain/PurchaseItem.test.ts (4 tests) 4ms
+ ✓ src/tests/architecture/domain-purity.test.ts (1 test) 4ms
+ ✓ src/tests/architecture/repository-contract.test.ts (1 test) 2ms
+ ✓ src/tests/architecture/integration-boundary.test.ts (1 test) 4ms
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > melempar NotFoundError jika variant tidak ditemukan
+AssertionError: expected NotFoundError: ProductVariant with id VX9… to match object { name: 'NotFoundError', …(1) }
+
+- Expected
++ Received
+
+- {
+-   "message": "ProductVariant not found: VX99",
++ NotFoundError {
+    "name": "NotFoundError",
+  }
+
+ ❯ src/modules/sales/tests/CreateOrder.test.ts:195:5
+    193| 
+    194|   it("melempar NotFoundError jika variant tidak ditemukan", async () => {
+    195|     await expect(
+       |     ^
+    196|       useCase.execute({
+    197|         orderId: "ORD-103",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 48 passed (49)
+      Tests  1 failed | 167 passed (168)
+   Start at  01:23:17
+   Duration  133.95s (transform 1.79s, setup 9.54s, import 5.28s, tests 2.82s, environment 99.64s)

@@ -1,0 +1,2 @@
+src/modules/sales/tests/PayCredit.test.ts
+src/modules/sales/application/PayCredit.ts
