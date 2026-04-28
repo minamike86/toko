@@ -1,0 +1,124 @@
+PS C:\belajar_nextjs15\github\toko\toko-v> npx vitest run
+>>
+
+ RUN  v4.0.18 C:/belajar_nextjs15/github/toko/toko-v
+
+ ❯ src/modules/inventory/tests/ConcurrentIssueStock.test.ts (1 test | 1 failed) 15ms
+     × allows only one order to consume stock when two orders compete 14ms
+ ❯ src/modules/sales/tests/CreateOrder.test.ts (3 tests | 3 failed) 19ms
+     × creates CASH order and marks it as PAID 8ms
+     × creates CREDIT order and marks it as ON_CREDIT 1ms
+     × marks order as FAILED when inventory rejects stock issue 8ms
+ ✓ src/modules/sales/tests/integration/CreateAndCancelOrder.integration.test.ts (1 test) 200ms
+ ❯ src/modules/inventory/tests/IssueStock.test.ts (2 tests | 1 failed) 15ms
+     × reduces stock and records OUT movement 7ms
+     ✓ throws error when stock is insufficient 5ms
+ ❯ src/modules/sales/tests/CancelOrder.test.ts (2 tests | 1 failed) 12ms
+     ✓ cancels CREATED order without touching inventory 3ms
+     × cancels PAID order and returns stock 4ms
+ ❯ src/modules/inventory/tests/AdjustStock.test.ts (1 test | 1 failed) 6ms
+     × sets stock to new quantity and records ADJUST movement 5ms
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/modules/inventory/tests/AdjustStock.test.ts > AdjustStock Use Case > sets stock to new quantity and records ADJUST movement
+TypeError: item.adjustStock is not a function
+ ❯ AdjustStock.execute src/modules/inventory/application/AdjustStock.ts:35:10
+     33|     });
+     34| 
+     35|     item.adjustStock(movement);
+       |          ^
+     36| 
+     37|     await this.deps.inventoryRepo.save(item);
+ ❯ src/modules/inventory/tests/AdjustStock.test.ts:62:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+ FAIL  src/modules/inventory/tests/ConcurrentIssueStock.test.ts > Concurrent IssueStock > allows only one order to consume stock when two orders compete
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/modules/inventory/tests/ConcurrentIssueStock.test.ts:96:23
+     94|     );
+     95| 
+     96|     expect(fulfilled).toHaveLength(1);
+       |                       ^
+     97|     expect(rejected).toHaveLength(1);
+     98| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+ FAIL  src/modules/inventory/tests/IssueStock.test.ts > IssueStock Use Case > reduces stock and records OUT movement
+TypeError: this.inventoryRepo.find is not a function
+ ❯ IssueStock.execute src/modules/inventory/application/IssueStock.ts:19:45
+     17|   async execute(requests: IssueStockRequest[]): Promise<void> {
+     18|     for (const req of requests) {
+     19|       const item = await this.inventoryRepo.find(req.productId);
+       |                                             ^
+     20| 
+     21| if (!item || !item.canFulfill(req.quantity)) {
+ ❯ src/modules/inventory/tests/IssueStock.test.ts:62:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  src/modules/sales/tests/CancelOrder.test.ts > CancelOrder Use Case > cancels PAID order and returns stock
+DomainError: Money amount tidak valid.
+ ❯ Money.of src/shared/value-objects/Money.ts:8:13
+      6|   static of(amount: number): Money {
+      7|     if (!Number.isFinite(amount) || amount < 0) {
+      8|       throw new DomainError("Money amount tidak valid.");
+       |             ^
+      9|     }
+     10|     // MVP: pakai number, asumsi integer rupiah. Kalau nanti butuh decimal, ADR dulu.
+ ❯ src/modules/sales/application/CreateOrder.ts:74:34
+ ❯ CreateOrder.execute src/modules/sales/application/CreateOrder.ts:59:36
+ ❯ src/modules/sales/tests/CancelOrder.test.ts:124:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+ FAIL  src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > creates CASH order and marks it as PAID
+DomainError: Money amount tidak valid.
+ ❯ Money.of src/shared/value-objects/Money.ts:8:13
+      6|   static of(amount: number): Money {
+      7|     if (!Number.isFinite(amount) || amount < 0) {
+      8|       throw new DomainError("Money amount tidak valid.");
+       |             ^
+      9|     }
+     10|     // MVP: pakai number, asumsi integer rupiah. Kalau nanti butuh decimal, ADR dulu.
+ ❯ src/modules/sales/application/CreateOrder.ts:74:34
+ ❯ CreateOrder.execute src/modules/sales/application/CreateOrder.ts:59:36
+ ❯ src/modules/sales/tests/CreateOrder.test.ts:76:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+ FAIL  src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > creates CREDIT order and marks it as ON_CREDIT
+DomainError: Money amount tidak valid.
+ ❯ Money.of src/shared/value-objects/Money.ts:8:13
+      6|   static of(amount: number): Money {
+      7|     if (!Number.isFinite(amount) || amount < 0) {
+      8|       throw new DomainError("Money amount tidak valid.");
+       |             ^
+      9|     }
+     10|     // MVP: pakai number, asumsi integer rupiah. Kalau nanti butuh decimal, ADR dulu.
+ ❯ src/modules/sales/application/CreateOrder.ts:74:34
+ ❯ CreateOrder.execute src/modules/sales/application/CreateOrder.ts:59:36
+ ❯ src/modules/sales/tests/CreateOrder.test.ts:96:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+ FAIL  src/modules/sales/tests/CreateOrder.test.ts > CreateOrder Use Case > marks order as FAILED when inventory rejects stock issue
+AssertionError: expected null not to be null
+ ❯ src/modules/sales/tests/CreateOrder.test.ts:131:29
+    129|     );
+    130|
+    131|     expect(failedOrder).not.toBeNull();
+       |                             ^
+    132|     expect(failedOrder!.getStatus()).toBe("FAILED");
+    133|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+ Test Files  5 failed | 1 passed (6)
+      Tests  7 failed | 3 passed (10)
+   Start at  17:43:53
+   Duration  1.42s (transform 606ms, setup 0ms, import 992ms, tests 268ms, environment 2ms)

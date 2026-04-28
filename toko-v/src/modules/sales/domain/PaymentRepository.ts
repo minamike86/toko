@@ -1,6 +1,6 @@
 import { Payment } from './Payment';
 
 export interface PaymentRepository {
-  save(payment: Payment): Promise<void>;
-  sumAmountByOrderId(orderId: string): Promise<number>;
+  save(payment: Payment, tx?: unknown): Promise<void>;
+  sumAmountByOrderId(orderId: string, tx?: unknown): Promise<number>;
 }

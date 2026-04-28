@@ -1,8 +1,7 @@
 // src/modules/reporting/tests/integration/sales-summary.integration.test.ts
-import { describe, it, beforeEach,  expect } from "vitest";
+import { describe, it, beforeEach, expect } from "vitest";
 import { prisma } from "@/shared/prisma";
 import { getSalesSummaryReport } from "../../application/get-sales-summary-report";
-
 import { seedSalesSummaryScenario } from "../helpers/seedSalesSummaryScenario";
 
 describe.sequential("Sales Summary Report – Integration Test", () => {
@@ -13,19 +12,16 @@ describe.sequential("Sales Summary Report – Integration Test", () => {
   });
 
   it("groups PAID sales by day and order type", async () => {
-    const day1 = new Date("2024-01-01T10:00:00Z");
-    const day2 = new Date("2024-01-02T10:00:00Z");
-
     await seedSalesSummaryScenario([
       {
         orderType: "OFFLINE",
         amount: 100_000,
-        occurredAt: day1,
+        paidAt: new Date("2024-01-01T10:00:00.000Z"),
       },
       {
         orderType: "ONLINE",
         amount: 50_000,
-        occurredAt: day2,
+        paidAt: new Date("2024-01-01T11:00:00.000Z"),
       },
     ]);
 
@@ -34,6 +30,21 @@ describe.sequential("Sales Summary Report – Integration Test", () => {
       to: new Date("2024-01-03T00:00:00Z"),
     });
 
-    expect(report.rows).toHaveLength(2);
+    expect(report).toEqual({
+      rows: [
+        {
+          period: "2024-01-01",
+          orderType: "OFFLINE",
+          totalPaidOrders: 1,
+          totalSalesAmount: 100000,
+        },
+        {
+          period: "2024-01-01",
+          orderType: "ONLINE",
+          totalPaidOrders: 1,
+          totalSalesAmount: 50000,
+        },
+      ],
+    });
   });
 });

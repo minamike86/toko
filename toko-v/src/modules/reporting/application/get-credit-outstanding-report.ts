@@ -1,9 +1,8 @@
-// src/modules/reporting/application/get-credit-outstanding-report.ts
-import {
-  CreditOutstandingReportDTO,
+import type {
   CreditOutstandingDetailDTO,
-} from "../dto/credit-outstanding.dto";
-import { findCreditOutstanding } from "../queries/credit-outstanding.query";
+  CreditOutstandingReportDTO,
+} from "@/modules/reporting/dto/credit-outstanding.dto";
+import { findCreditOutstanding } from "@/modules/reporting/queries/credit-outstanding.query";
 
 export async function getCreditOutstandingReport(params: {
   from: Date;
@@ -11,24 +10,24 @@ export async function getCreditOutstandingReport(params: {
 }): Promise<CreditOutstandingReportDTO> {
   const rows = await findCreditOutstanding(params);
 
-  const details: CreditOutstandingDetailDTO[] = rows.map((r) => ({
-    orderId: r.orderId,
-    orderDate: r.orderDate,
-    orderType: r.orderType,
-    totalAmount: r.totalAmount,
-    outstandingAmount: r.outstandingAmount,
+  const details: CreditOutstandingDetailDTO[] = rows.map((row) => ({
+    orderId: row.orderId,
+    createdAt: row.orderDate,
+    orderType: row.orderType,
+    totalAmount: row.totalAmount,
+    outstandingAmount: row.outstandingAmount,
   }));
 
-  const summary = {
-    totalOutstandingAmount: details.reduce(
-      (sum, d) => sum + d.outstandingAmount,
-      0
-    ),
-    totalCreditOrders: details.length,
-  };
+  const totalOutstandingAmount = details.reduce(
+    (sum, detail) => sum + detail.outstandingAmount,
+    0,
+  );
 
   return {
     details,
-    summary,
+    summary: {
+      totalOutstandingAmount,
+      totalCreditOrders: details.length,
+    },
   };
 }

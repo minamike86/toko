@@ -1,11 +1,8 @@
 export class InventoryItem {
-  private constructor(
-    private readonly productId: string,
-    private quantity: number
-  ) {}
+  private constructor(private quantity: number) { }
 
-  static of(productId: string, quantity: number): InventoryItem {
-    return new InventoryItem(productId, quantity);
+  static of(quantity: number): InventoryItem {
+    return new InventoryItem(quantity);
   }
 
   canFulfill(requestedQuantity: number): boolean {
@@ -16,9 +13,11 @@ export class InventoryItem {
     if (quantity <= 0) {
       throw new Error("Quantity must be positive");
     }
+
     if (this.quantity < quantity) {
       throw new Error("Insufficient stock");
     }
+
     this.quantity -= quantity;
   }
 
@@ -26,15 +25,11 @@ export class InventoryItem {
     if (quantity <= 0) {
       throw new Error("Quantity must be positive");
     }
+
     this.quantity += quantity;
   }
 
-  getProductId(): string {
-    return this.productId;
-  }
-
   getQuantity(): number {
-    // optional, hanya untuk reporting / test
     return this.quantity;
   }
 }

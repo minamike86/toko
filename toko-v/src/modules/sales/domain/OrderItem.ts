@@ -6,16 +6,18 @@ export class OrderItem {
   private constructor(
     readonly id: EntityId,
     readonly productId: EntityId,
+    readonly variantId: EntityId,
     readonly productNameSnapshot: string,
     readonly unitSnapshot: string,
     readonly unitPriceSnapshot: Money,
     readonly quantity: PositiveInt,
     readonly subtotal: Money
-  ) {}
+  ) { }
 
   static create(params: {
     id: EntityId;
     productId: EntityId;
+    variantId: EntityId,
     productNameSnapshot: string;
     unitSnapshot: string;
     unitPriceSnapshot: Money;
@@ -25,6 +27,7 @@ export class OrderItem {
     return new OrderItem(
       params.id,
       params.productId,
+      params.variantId,
       params.productNameSnapshot,
       params.unitSnapshot,
       params.unitPriceSnapshot,

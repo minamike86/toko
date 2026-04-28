@@ -1,13 +1,14 @@
-// src/modules/reporting/queries/credit-payment-history.query.ts
 import { prisma } from "@/shared/prisma";
 
 export type CreditPaymentHistoryRow = {
+  paymentId: string;
   orderId: string;
   paymentDate: Date;
   orderDate: Date;
   orderType: string;
   totalAmount: number;
   paidAmount: number;
+  method: string;
 };
 
 export async function findCreditPaymentHistory(params: {
@@ -18,7 +19,7 @@ export async function findCreditPaymentHistory(params: {
 
   const payments = await prisma.payment.findMany({
     where: {
-      occurredAt: {
+      paidAt: {
         gte: from,
         lte: to,
       },
@@ -27,8 +28,10 @@ export async function findCreditPaymentHistory(params: {
       },
     },
     select: {
+      id: true,
       amount: true,
-      occurredAt: true,
+      paidAt: true,
+      method: true,
       order: {
         select: {
           id: true,
@@ -38,17 +41,17 @@ export async function findCreditPaymentHistory(params: {
         },
       },
     },
-    orderBy: {
-      occurredAt: "asc",
-    },
+    orderBy: [{ paidAt: "asc" }, { id: "asc" }],
   });
 
   return payments.map((p) => ({
+    paymentId: p.id,
     orderId: p.order.id,
-    paymentDate: p.occurredAt,
+    paymentDate: p.paidAt,
     orderDate: p.order.createdAt,
     orderType: p.order.type,
     totalAmount: p.order.totalAmount,
     paidAmount: p.amount,
+    method: p.method,
   }));
 }

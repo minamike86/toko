@@ -1,0 +1,21 @@
+npx vitest run src/modules/reporting/tests/integration/inventory-movement-history.integration.test.ts 
+npx vitest run src/modules/reporting/tests/integration/inventory-low-stock.integration.test.ts 
+npx vitest run src/modules/sales/tests/integration/CreateAndCancelOrder.integration.test.ts 
+npx vitest run src/modules/reporting/tests/integration/inventory-snapshot.integration.test.ts 
+npx vitest run src/modules/reporting/tests/integration/sales-summary.integration.test.ts 
+npx vitest run src/modules/reporting/tests/integration/credit-payment-history.integration.test.ts 
+npx vitest run src/modules/reporting/tests/integration/credit-outstanding.integration.test.ts 
+npx vitest run src/tests/architecture/reporting-boundary.test.ts 
+npx vitest run src/modules/inventory/tests/ConcurrentIssueStock.test.ts 
+npx vitest run src/modules/sales/tests/PayCredit.test.ts 
+npx vitest run src/modules/sales/tests/CreateOrder.test.ts 
+npx vitest run src/modules/inventory/tests/IssueStock.test.ts 
+npx vitest run src/modules/sales/tests/CancelOrder.test.ts
+npx vitest run src/tests/architecture/usecase-deps.test.ts 
+npx vitest run src/tests/architecture/integration-boundary.test.ts 
+npx vitest run src/tests/architecture/domain-purity.test.ts  
+npx vitest run src/modules/inventory/tests/AdjustStock.test.ts  
+npx vitest run src/tests/architecture/repository-contract.test.ts  
+
+✓ = lulus
+× = gagal 

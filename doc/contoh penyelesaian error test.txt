@@ -1,0 +1,11 @@
+error:
+Class 'InMemoryInventoryRepository' incorrectly implements interface 'InventoryRepository'.
+  Type 'InMemoryInventoryRepository' is missing the following properties 
+from type 'InventoryRepository': find, increase, decrease.
+Constructor of class 'InventoryItem' is private and only accessible within the class declaration.
+Property 'productId' is private and only accessible within class 'InventoryItem'.
+Object literal may only specify known properties, and 'inventoryRepo' does not exist in type 'InventoryRepository'.
+
+oke tulis full code perbaikannya dan ingat jangan ada any serta 
+jangan ubah dokumen yang ku upload kecuali ConcurrentIssueStock.test.ts
+yang sedang kita perbaiki ini btw contohnya dengan bahasa indonesia

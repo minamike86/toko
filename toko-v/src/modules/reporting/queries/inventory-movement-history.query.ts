@@ -1,53 +1,40 @@
-export type InventoryMovementHistoryDTO = {
-  id: string;
-  productId: string;
-  movementDate: Date;
-  movementType: string;
-  quantity: number;
-  reason: string;
-  referenceId: string | null;
-};
+import { prisma } from "@/shared/prisma";
 
 type MovementWhere = {
   productId?: string;
+  variantId?: string;
   occurredAt?: {
     gte?: Date;
     lte?: Date;
   };
 };
 
-type MovementRow = {
+export type InventoryMovementHistoryRow = {
   id: string;
   productId: string;
+  variantId: string | null;
   occurredAt: Date;
   type: string;
+  origin: string;
   quantity: number;
   reason: string;
   referenceId: string | null;
 };
 
-
-type ReportingDb = {
-  stockMovement: {
-    findMany: (args: {
-      where?: MovementWhere;
-      orderBy: [{ occurredAt: "asc" }, { id: "asc" }];
-    }) => Promise<MovementRow[]>;
-  };
-};
-
-export async function getInventoryMovementHistory(
-  db: ReportingDb,
-  filter?: {
-    productId?: string;
-    from?: Date;
-    to?: Date;
-  }
-): Promise<InventoryMovementHistoryDTO[]> {
+export async function findInventoryMovementHistory(filter?: {
+  productId?: string;
+  variantId?: string;
+  from?: Date;
+  to?: Date;
+}): Promise<InventoryMovementHistoryRow[]> {
   const where: MovementWhere = {};
 
   if (filter?.productId) {
     where.productId = filter.productId;
+  }
+
+  if (filter?.variantId) {
+    where.variantId = filter.variantId;
   }
 
   if (filter?.from || filter?.to) {
@@ -57,19 +44,29 @@ export async function getInventoryMovementHistory(
     };
   }
 
-  const rows = await db.stockMovement.findMany({
+  const rows = await prisma.stockMovement.findMany({
     where,
-    orderBy: [
-      { occurredAt: "asc" },
-      { id: "asc" },
-    ],
+    orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      productId: true,
+      variantId: true,
+      occurredAt: true,
+      type: true,
+      origin: true,
+      quantity: true,
+      reason: true,
+      referenceId: true,
+    },
   });
 
   return rows.map((row) => ({
     id: row.id,
     productId: row.productId,
-    movementDate: row.occurredAt,
-    movementType: row.type,
+    variantId: row.variantId,
+    occurredAt: row.occurredAt,
+    type: row.type,
+    origin: row.origin,
     quantity: row.quantity,
     reason: row.reason,
     referenceId: row.referenceId,
